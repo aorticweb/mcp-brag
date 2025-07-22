@@ -25,7 +25,8 @@ MCP-RAG is a comprehensive document processing and semantic search solution that
 | DOCX | `.docx` | Microsoft Word documents | ✅ Tested |
 | PPTX | `.pptx` | Microsoft PowerPoint presentations | 🔄 In Progress |
 | PDF | `.pdf` | Portable Document Format files | ✅ Tested |
-| Audio | Various | Audio files (transcribed to text) | ✅ Tested |
+| Audio | `.mp3`, `.wav`, `.m4a` | Audio files (transcribed to text) | ✅ Tested |
+| YouTube | `.mp3` | YouTube videos (transcribed to text) | ✅ Tested |
 | Other | Various | Any other text format files | ✅ Tested |
 
 ## Architecture
@@ -42,6 +43,7 @@ MCP-RAG consists of three main components:
 
 - Python 3.12.9 or higher
 - Node.js 22.9.0 or higher
+- uv (Python package manager) - Install with: `curl -LsSf https://astral.sh/uv/install.sh | sh` or `pip install uv`
 - macOS, Linux, or Windows
 
 ### Quick Start
@@ -52,24 +54,35 @@ git clone https://github.com/yourusername/mcp-rag.git
 cd mcp-rag
 ```
 
-2. Install Python dependencies:
+2. Install all dependencies using uv:
 ```bash
-pip install -e ".[server,embedder,dev]"
+make install
+# Or manually:
+uv sync --extra server --extra embedder --extra dev
 ```
 
 3. Install UI dependencies:
 ```bash
 cd ui
 npm install
+cd ..
 ```
 
 4. Run the services:
 ```bash
+# Using make commands:
+# Terminal 1: Start the MCP server (includes embedder)
+make run-server
+
+# Terminal 2: Start the UI (development mode)  
+make run-ui-app-dev
+
+# Or manually with uv:
 # Terminal 1: Start the embedder
-python -m embedder.main
+uv run python -m embedder.main
 
 # Terminal 2: Start the MCP server
-python -m server.main
+uv run python -m server.main
 
 # Terminal 3: Start the UI (development mode)
 cd ui && npm run dev
@@ -123,15 +136,44 @@ mcp-rag/
 ### Running Tests
 
 ```bash
-pytest tests/
+make unit-test
+# Or manually:
+uv run pytest tests/
 ```
 
 ### Building the Desktop App
 
 ```bash
+# Build complete application (server + UI)
+make build
+
+# Or build components separately:
+make build-server  # Build server executable
+make package-app   # Build desktop app
+
+# Manual commands:
 cd ui
 npm run package  # Package for current platform
 npm run make     # Create distributable
+```
+
+### Development Commands
+
+```bash
+# Format code
+make format
+
+# Lint code
+make lint
+
+# Update dependencies
+make update
+
+# Clean and reinstall
+make clean
+
+# See all available commands
+make help
 ```
 
 ## Performance
@@ -156,3 +198,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 For questions, issues, or feature requests, please open an issue on the GitHub repository.
+
+## Vibe
+The entire ui was vibe coded using Claude code.
+Some of the python features were also vibe coded at times (especially test generation).
