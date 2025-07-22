@@ -1,0 +1,807 @@
+openapi: 3.1.0
+info:
+  title: MCP RAG API
+  description: API for managing and searching document embeddings using MCP (Model Context Protocol) RAG system
+  version: 1.0.0
+  
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /manual/process_file_async:
+    post:
+      summary: Process a file for embedding asynchronously
+      description: Starts processing a file to generate embeddings in the background and returns immediately. Use the ingestion_status endpoint to check progress.
+      tags:
+        - File Processing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - file_path
+              properties:
+                file_path:
+                  type: string
+                  description: Path to the file or directory to process
+                  example:
+                    - "/path/to/document.txt"
+                    - "/path/to/directory"
+                source_name:
+                  type: string
+                  description: Optional custom name for the data source. If not provided, the file path will be used as the source name.
+                  example: "My Important Document"
+      responses:
+        '201':
+          description: File processing started successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessFileAsyncResponse'
+
+  /manual/search_file:
+    post:
+      summary: Search files using semantic search
+      description: Performs semantic search across processed files using embeddings
+      tags:
+        - Search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  description: Search query text
+                  example: "machine learning algorithms"
+                offset:
+                  type: integer
+                  description: Offset for pagination
+                  default: 0
+                  example: 0
+      responses:
+        '200':
+          description: Search results or an error if the query is invalid.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SearchResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
+
+  /manual/system_status:
+    get:
+      summary: Get system statistics
+      description: Returns system health and statistics about the vector database. This endpoint always returns a 200 status.
+      tags:
+        - System
+      responses:
+        '200':
+          description: System statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStatsResponse'
+
+  /manual/health:
+    get:
+      summary: Health check
+      description: Returns the health status of the service
+      tags:
+        - System
+      responses:
+        '200':
+          description: Health check response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    enum: ["ok"]
+                    example: "ok"
+
+  /manual/config:
+    get:
+      summary: Get configuration
+      description: |
+        Returns all current configuration settings with their values, types, and frozen status.
+        
+        Available configurations include:
+        - **Editable configurations:**
+          - INGESTION_PROCESS_MAX_FILE_PATHS: Maximum number of file paths processed in a single ingestion batch
+          - CHUNK_CHARACTER_LIMIT: Character limit for text chunks during ingestion
+          - SEARCH_CHUNK_CHARACTER_LIMIT: Character limit for chunks returned in search results
+          - SEARCH_CHUNKS_LIMIT: Maximum number of chunks to process during search
+          - SEARCH_PROCESSING_TIMEOUT_SECONDS: Timeout for search processing operations
+          - SEARCH_CONTEXT_EXTENSION_CHARACTERS: Additional characters to include for context extension
+          - SEARCH_RESULT_LIMIT: Maximum number of search results to return
+        
+        - **Frozen (read-only) configurations:**
+          - AUDIO_TRANSCRIPTION_DIR: Directory for storing audio transcriptions
+          - AUDIO_TRANSCRIPTION_IDLE_TIMEOUT: Idle timeout for audio transcription threads
+          - DOWNLOAD_THREAD_IDLE_TIMEOUT: Idle timeout for download threads
+          - EMBEDDER_IDLE_TIMEOUT: Idle timeout for embedder threads
+          - TEMP_AUDIO_DIR: Temporary directory for audio processing
+          - VECTORIZER_MODEL_PATH: Path to the vectorizer model
+          - EMBEDDING_SIZE: Size of embeddings
+          - SQLITE_DB_LOCATION: Location of SQLite database
+          - BULK_QUEUE_FULL_SLEEP_TIME: Sleep time when bulk queue is full
+          - BULK_QUEUE_FULL_RETRY_COUNT: Retry count for bulk queue operations
+          - INSTRUCTIONS: MCP server instructions
+          - WHISPER_MODEL_SIZE: Size of Whisper model for audio transcription
+          - PARAKEET_MODEL_PATH: Path to Parakeet model
+          - PARAKEET_CHUNK_DURATION: Duration of chunks for Parakeet processing
+          - PARAKEET_OVERLAP_DURATION: Overlap duration for Parakeet chunks
+      tags:
+        - Configuration
+      responses:
+        '200':
+          description: Current configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigResponse'
+    
+    post:
+      summary: Set configuration
+      description: Updates an editable configuration setting. Frozen configurations cannot be modified.
+      tags:
+        - Configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - config_name
+                - config_value
+              properties:
+                config_name:
+                  type: string
+                  description: Name of the configuration setting to update
+                  enum:
+                    - INGESTION_PROCESS_MAX_FILE_PATHS
+                    - CHUNK_CHARACTER_LIMIT
+                    - SEARCH_CHUNK_CHARACTER_LIMIT
+                    - SEARCH_CHUNKS_LIMIT
+                    - SEARCH_PROCESSING_TIMEOUT_SECONDS
+                    - SEARCH_CONTEXT_EXTENSION_CHARACTERS
+                    - SEARCH_RESULT_LIMIT
+                  example: "SEARCH_RESULT_LIMIT"
+                config_value:
+                  description: Value for the configuration setting. Type depends on the config_name.
+                  oneOf:
+                    - type: string
+                    - type: integer
+                    - type: number
+                    - type: boolean
+                    - type: array
+                    - type: object
+                  example: 10
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigUpdateResponse'
+        '400':
+          description: Invalid config name or value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /manual/data_sources:
+    get:
+      summary: Get available data sources
+      description: Returns a list of all available data sources, optionally filtered by source name or specific source path
+      tags:
+        - Data Sources
+      parameters:
+        - name: source_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional source name to filter data sources by name
+          example: "My Important Document"
+        - name: source
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional source path to get stats for a specific data source
+          example: "/path/to/document.txt"
+      responses:
+        '200':
+          description: Successful response with a list of data sources.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataSourcesResponse'
+        '400':
+          description: Bad request when both source_name and source parameters are provided together
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error, e.g., if the data source map is not initialized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /manual/ingestion_status:
+    post:
+      summary: Get ingestion status for a data source
+      description: Returns the current ingestion status and progress for a specific data source
+      tags:
+        - Data Sources
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                  description: The data source (file path or URL) to check ingestion status for
+                  example: "/path/to/document.txt"
+      responses:
+        '200':
+          description: Ingestion status information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionStatusResponse'
+
+  /manual/delete_data_source:
+    post:
+      summary: Delete a data source
+      description: Deletes a data source and all its associated embeddings from the vector database
+      tags:
+        - Data Sources
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                  description: The data source (file path) to delete
+                  example: "/path/to/document.txt"
+      responses:
+        '200':
+          description: Delete operation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteDataSourceResponse'
+
+  /manual/delete_data_sources_by_name:
+    post:
+      summary: Delete data sources by name
+      description: Deletes all data sources that share the given source name and their associated embeddings from the vector database
+      tags:
+        - Data Sources
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source_name
+              properties:
+                source_name:
+                  type: string
+                  description: The common name of the data sources to delete
+                  example: "My Important Document"
+      responses:
+        '200':
+          description: Delete operation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteDataSourcesByNameResponse'
+
+  /manual/active_data_sources:
+    get:
+      summary: Get active data sources
+      description: Returns a list of currently active data sources that are being used for search operations
+      tags:
+        - Data Sources
+      responses:
+        '200':
+          description: List of active data sources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveDataSourcesResponse'
+
+  /manual/mark_data_sources_as_active:
+    post:
+      summary: Mark data sources as active
+      description: Marks the specified data sources as active, making them available for search operations
+      tags:
+        - Data Sources
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source_paths
+              properties:
+                source_paths:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of source paths to mark as active
+                  example: ["/path/to/document1.txt", "/path/to/document2.txt"]
+      responses:
+        '200':
+          description: Data sources marked as active successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveDataSourcesResponse'
+
+  /manual/mark_data_sources_as_inactive:
+    post:
+      summary: Mark data sources as inactive
+      description: Marks the specified data sources as inactive, removing them from search operations
+      tags:
+        - Data Sources
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source_paths
+              properties:
+                source_paths:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of source paths to mark as inactive
+                  example: ["/path/to/document1.txt", "/path/to/document2.txt"]
+      responses:
+        '200':
+          description: Data sources marked as inactive successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveDataSourcesResponse'
+
+  /manual/process_url_async:
+    post:
+      summary: Process a URL asynchronously
+      description: Adds a URL to the download queue for processing. Currently supports YouTube URLs which will be downloaded, transcribed, and indexed.
+      tags:
+        - File Processing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: The URL to ingest (currently supports YouTube URLs)
+                  example: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                source_name:
+                  type: string
+                  description: Optional source name to associate with the data source
+                  example: "My Important Document"
+      responses:
+        '201':
+          description: URL successfully added to download queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestUrlResponse'
+        '400':
+          description: Bad request when URL is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ProcessFileAsyncResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: ["success"]
+          example: "success"
+
+    IngestUrlResponse:
+      type: object
+      required:
+        - status
+        - message
+      properties:
+        status:
+          type: string
+          enum: ["success"]
+          example: "success"
+        message:
+          type: string
+          description: Confirmation message
+          example: "URL https://www.youtube.com/watch?v=dQw4w9WgXcQ added to download queue"
+
+    SearchResponse:
+      type: object
+      required:
+        - status
+        - query
+        - results_count
+        - search_time_seconds
+        - results
+      properties:
+        status:
+          type: string
+          enum: ["success"]
+          example: "success"
+        query:
+          type: string
+          description: The search query that was executed
+          example: "machine learning algorithms"
+        results_count:
+          type: integer
+          description: Number of results returned
+          example: 5
+        search_time_seconds:
+          type: string
+          description: Search execution time in seconds as formatted string
+          example: "0.123"
+        results:
+          type: array
+          description: Array of search results
+          items:
+            $ref: '#/components/schemas/SearchResult'
+
+    SearchResult:
+      type: object
+      required:
+        - text
+        - source
+        - distance
+      properties:
+        text:
+          type: string
+          description: The matching text content from the document
+          example: "Machine learning algorithms are computational methods that enable computers to learn and make decisions from data without being explicitly programmed for every task."
+        source:
+          type: string
+          description: Source file path where the text was found
+          example: "/path/to/document.txt"
+        distance:
+          type: number
+          description: Distance between the query and the text
+          example: 0.123
+
+    DataSourceFile:
+      type: object
+      required:
+        - source_path
+        - status
+        - vector_count
+        - dimension
+      properties:
+        source_name:
+          type: string
+          nullable: true
+          description: Name of the data source (typically the file name)
+          example: "document.txt"
+        source_path:
+          type: string
+          description: Path to the source file
+          example: "/path/to/document.txt"
+        status:
+          type: string
+          description: Current ingestion status
+          enum: ["not_found", "processing", "completed", "failed"]
+          example: "completed"
+        vector_count:
+          type: integer
+          description: Number of vectors generated from this file
+          example: 42
+        dimension:
+          type: integer
+          description: Dimension of the vectors
+          example: 384
+
+    SystemStatsResponse:
+      type: object
+      required:
+        - status
+        - system_health
+      properties:
+        status:
+          type: string
+          enum: ["success"]
+          example: "success"
+        system_health:
+          type: string
+          description: Current system health status
+          example: "operational"
+
+    ConfigResponse:
+      type: object
+      required:
+        - status
+        - data
+      properties:
+        status:
+          type: string
+          enum: ["ok"]
+          example: "ok"
+        data:
+          type: object
+          description: All configuration settings with their values, types, and frozen status
+          additionalProperties:
+            $ref: '#/components/schemas/ConfigItem'
+          example:
+            SEARCH_RESULT_LIMIT:
+              value: 5
+              type: "int"
+              frozen: false
+            SEARCH_CHUNK_CHARACTER_LIMIT:
+              value: 1000
+              type: "int"
+              frozen: false
+            EMBEDDER_IDLE_TIMEOUT:
+              value: 10
+              type: "timedelta"
+              frozen: true
+            AUDIO_TRANSCRIPTION_DIR:
+              value: "audio_transcriptions"
+              type: "str"
+              frozen: true
+            WHISPER_MODEL_SIZE:
+              value: "base"
+              type: "str"
+              frozen: true
+
+    ConfigUpdateResponse:
+      type: object
+      required:
+        - status
+        - data
+      properties:
+        status:
+          type: string
+          enum: ["ok"]
+          example: "ok"
+        data:
+          type: object
+          description: Updated configuration setting
+          additionalProperties:
+            $ref: '#/components/schemas/ConfigItem'
+          example:
+            SEARCH_RESULT_LIMIT:
+              value: 10
+              type: "int"
+              frozen: false
+
+    ConfigItem:
+      type: object
+      required:
+        - value
+        - type
+        - frozen
+      properties:
+        value:
+          description: The configuration value (can be any type)
+          oneOf:
+            - type: string
+            - type: integer
+            - type: number
+            - type: boolean
+            - type: array
+            - type: object
+          example: 10
+        type:
+          type: string
+          description: The Python type name of the value
+          example: "int"
+        frozen:
+          type: boolean
+          description: Whether this configuration is frozen (read-only)
+          example: false
+
+    DataSourcesResponse:
+      type: object
+      required:
+        - status
+        - total_files
+        - total_vectors
+        - files
+      properties:
+        status:
+          type: string
+          enum: ["success"]
+          example: "success"
+        total_files:
+          type: integer
+          description: Total number of data source files
+          example: 3
+        total_vectors:
+          type: integer
+          description: Total number of vectors across all files
+          example: 150
+        files:
+          type: array
+          description: List of data source files with their metadata
+          items:
+            $ref: '#/components/schemas/DataSourceFile'
+
+    ErrorResponse:
+      type: object
+      required:
+        - status
+        - error
+      properties:
+        status:
+          type: string
+          enum: ["error"]
+          example: "error"
+        error:
+          type: string
+          description: Error message describing what went wrong
+          example: "Query cannot be empty"
+
+    IngestionStatusResponse:
+      type: object
+      required:
+        - status
+        - ingestion_status
+      properties:
+        status:
+          type: string
+          enum: ["success"]
+          example: "success"
+        ingestion_status:
+          type: string
+          description: Current ingestion status
+          enum: ["not_found", "processing", "completed", "failed"]
+          example: "completed"
+        message:
+          type: string
+          description: Optional message, present for not_found and failed states
+          example: "Data source /path/to/document.txt not found"
+        progress:
+          type: object
+          description: Progress information, only present when ingestion_status is "processing"
+          properties:
+            data_source_id:
+              type: string
+              description: The ID of the data source being processed
+              example: "/path/to/document.txt"
+            phase_progresses:
+              type: array
+              description: Progress information for each ingestion phase
+              items:
+                type: object
+                required:
+                  - phase
+                  - is_current_phase
+                  - percentage
+                properties:
+                  phase:
+                    type: string
+                    description: The name of the ingestion phase
+                    enum: ["initialization", "downloading", "transcription", "embedding", "storing", "completed"]
+                    example: "embedding"
+                  is_current_phase:
+                    type: boolean
+                    description: Whether this is the currently active phase
+                    example: true
+                  percentage:
+                    type: number
+                    nullable: true
+                    description: Progress percentage for this phase (0-100), null if total is unknown
+                    example: 45.5
+
+    DeleteDataSourceResponse:
+      type: object
+      required:
+        - status
+        - message
+        - data_source_was_found
+      properties:
+        status:
+          type: string
+          enum: ["success"]
+          example: "success"
+        message:
+          type: string
+          description: Success or failure message
+          example: "Data source /path/to/document.txt deleted successfully"
+        data_source_was_found:
+          type: boolean
+          description: Whether the data source was found and deleted
+          example: true
+
+    DeleteDataSourcesByNameResponse:
+      type: object
+      required:
+        - status
+        - message
+        - data_sources_were_found
+      properties:
+        status:
+          type: string
+          enum: ["success"]
+          example: "success"
+        message:
+          type: string
+          description: Success or failure message
+          example: "Data sources with name My Important Document deleted successfully"
+        data_sources_were_found:
+          type: boolean
+          description: Whether any matching data sources were found and deleted
+          example: true
+
+    ActiveDataSourcesResponse:
+      type: object
+      required:
+        - status
+        - active_data_sources
+      properties:
+        status:
+          type: string
+          enum: ["ok"]
+          example: "ok"
+        active_data_sources:
+          type: array
+          items:
+            type: string
+          description: List of currently active data source paths
+          example: ["/path/to/document1.txt", "/path/to/document2.txt"]
+
+tags:
+  - name: File Processing
+    description: Operations for processing files and generating embeddings
+  - name: Search
+    description: Operations for searching through processed documents
+  - name: Data Sources
+    description: Operations for managing and listing data sources
+  - name: Configuration
+    description: Operations for managing system configuration
+  - name: System
+    description: System health and statistics operations 

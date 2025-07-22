@@ -1,0 +1,4 @@
+batch_size: 1000
+sentence_transformers_home: "./.hf/"
+transformers_cache: "./.hf/"
+model_path: "sentence-transformers/all-MiniLM-L6-v2"

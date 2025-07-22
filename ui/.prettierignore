@@ -1,0 +1,10 @@
+dist
+.vite
+out
+node_modules
+server-dist
+*.min.js
+*.min.css
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
