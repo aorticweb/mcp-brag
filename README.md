@@ -1,6 +1,6 @@
 # MCP-RAG
 
-A high-performance Retrieval-Augmented Generation (RAG) system built with Model Context Protocol (MCP), providing semantic search and document embedding capabilities for AI applications.
+A high-performance Retrieval-Augmented Generation (RAG) system built with Model Context Protocol (MCP), providing semantic search and document embedding capabilities for AI applications. The embedding model and vector database all run locally and rely on open source models and libraries.
 
 ## Overview
 
