@@ -39,7 +39,7 @@ gen-server-client:
 	cd ui && npm run format
 
 run-server:
-	EMBEDDER_CONFIG_PATH=./embedder_config.yaml uv run python -m server.main
+	uv run python -m server.main
 
 run-ui-app-dev:
 	cd ui && npm run dev
@@ -73,7 +73,7 @@ build-server: install-server
 
 # Test the built executable
 run-server-executable:
-	EMBEDDER_CONFIG_PATH=./embedder_config.yaml ./ui/server-dist/python ./ui/server-dist/mcp_server.pyz
+	./ui/server-dist/python ./ui/server-dist/mcp_server.pyz
 
 help:
 	@echo "Available commands:"
