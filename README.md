@@ -50,15 +50,13 @@ BRAG [MCP] consists of three main components:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/BRAG [MCP].git
+git clone git@github.com:aorticweb/mcp-brag.git
 cd mcp-brag
 ```
 
 2. Install all dependencies using uv:
 ```bash
 make install
-# Or manually:
-uv sync --extra server --extra embedder --extra dev
 ```
 
 3. Install UI dependencies:
