@@ -1,18 +1,16 @@
-from dataclasses import dataclass
 from typing import List
 
 from fastmcp import FastMCP
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
-from common.config.field import env_field, int_env_field
 from common.log import get_logger
 from embedder.read_write.bulk_queue import BulkQueue
 from embedder.store.store import DataSourceMap
 from server.api.middleware import MCPErrorMiddleware
 from server.api.routes import ROUTES
 from server.api.tools import TOOLS
-from server.constants import INSTRUCTIONS
+from server.constants import INSTRUCTIONS, MCP_HOST, MCP_PORT
 from server.shared import (  # noqa: F401
     global_data_source_map,
     global_download_bulk_queue,
@@ -35,16 +33,9 @@ from transcriber import ParakeetProvider
 logger = get_logger(__name__)
 
 
-@dataclass
-class MCPConfig:
-    host: str = env_field("MCP_HOST", "localhost")
-    port: int = int_env_field("MCP_PORT", 8000)
-
-
 MCP_NAME = "Brag"
 
-cfg = MCPConfig()
-mcp: FastMCP = FastMCP(MCP_NAME, INSTRUCTIONS.value, host=cfg.host, port=cfg.port)
+mcp: FastMCP = FastMCP(MCP_NAME, INSTRUCTIONS.value, host=MCP_HOST.value, port=MCP_PORT.value)
 
 
 def initialize_dependencies(

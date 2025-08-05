@@ -1,13 +1,17 @@
 import time
-from dataclasses import dataclass
 from datetime import timedelta
 from queue import Empty, Full, Queue
 from threading import Lock
 from typing import Callable, Generic, List, Optional, TypeVar
 
-from common.config.field import int_env_field, timedelta_env_field
 from common.log import get_logger
-from embedder.constants import BULK_QUEUE_FULL_RETRY_COUNT, BULK_QUEUE_FULL_SLEEP_TIME
+from embedder.constants import (
+    ASYNC_QUEUE_BATCH_SIZE,
+    ASYNC_QUEUE_MAX_SIZE,
+    ASYNC_QUEUE_READ_SLEEP,
+    BULK_QUEUE_FULL_RETRY_COUNT,
+    BULK_QUEUE_FULL_SLEEP_TIME,
+)
 from embedder.text import TextBatch, TextInput
 
 logger = get_logger(__name__)
@@ -192,25 +196,6 @@ class BulkQueue(Generic[T]):
         return self._queue.full()
 
 
-@dataclass
-class BulkQueueConfig:
-    """Configuration class for BulkQueueReadWriter behavior.
-
-    This class defines configurable parameters for queue operations including
-    batch sizes, sleep intervals, and queue size limits. All values can be
-    overridden via environment variables.
-
-    Attributes:
-        batch_size: Number of items to process in each batch operation
-        sleep: Time to sleep when no items are available for reading
-        max_queue_size: Maximum number of items allowed in each queue
-    """
-
-    batch_size: int = int_env_field("ASYNC_QUEUE_BATCH_SIZE", 100)
-    sleep: timedelta = timedelta_env_field("ASYNC_QUEUE_READ_SLEEP", timedelta(milliseconds=50))
-    max_queue_size: int = int_env_field("ASYNC_QUEUE_MAX_SIZE", 100000)
-
-
 class BulkQueueReadWriter:
     """A read/write interface for bulk queue operations with batch processing.
 
@@ -239,17 +224,16 @@ class BulkQueueReadWriter:
             read_queue: Optional existing queue for reading. If None, creates new queue.
             write_queue: Optional existing queue for writing. If None, creates new queue.
         """
-        cfg = BulkQueueConfig()
-        self._read_queue = read_queue or BulkQueue(maxsize=cfg.max_queue_size)
-        self._write_queue = write_queue or BulkQueue(maxsize=cfg.max_queue_size)
-        self._batch_size = cfg.batch_size
-        self._sleep_time = cfg.sleep
+        self._read_queue = read_queue or BulkQueue(maxsize=ASYNC_QUEUE_MAX_SIZE.value)
+        self._write_queue = write_queue or BulkQueue(maxsize=ASYNC_QUEUE_MAX_SIZE.value)
+        self._batch_size = ASYNC_QUEUE_BATCH_SIZE.value
+        self._sleep_time = ASYNC_QUEUE_READ_SLEEP.value
 
         logger.debug(
             "BulkQueueReadWriter initialized with "
-            f"batch_size={cfg.batch_size}, "
-            f"max_queue_size={cfg.max_queue_size}, "
-            f"sleep_time={cfg.sleep.total_seconds(): .3f}s"
+            f"batch_size={ASYNC_QUEUE_BATCH_SIZE.value}, "
+            f"max_queue_size={ASYNC_QUEUE_MAX_SIZE.value}, "
+            f"sleep_time={ASYNC_QUEUE_READ_SLEEP.value.total_seconds(): .3f}s"
         )
 
     def read(self) -> TextBatch:

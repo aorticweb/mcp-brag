@@ -148,6 +148,11 @@ export const getManualHealth = <ThrowOnError extends boolean = false>(
  * - VECTORIZER_MODEL_PATH: Path to the vectorizer model
  * - EMBEDDING_SIZE: Size of embeddings
  * - SQLITE_DB_LOCATION: Location of SQLite database
+ * - ASYNC_QUEUE_BATCH_SIZE: Batch size for async queue
+ * - ASYNC_QUEUE_READ_SLEEP: Sleep time for async queue
+ * - ASYNC_QUEUE_MAX_SIZE: Maximum size of async queue
+ * - MCP_HOST: Host for MCP server
+ * - MCP_PORT: Port for MCP server
  * - BULK_QUEUE_FULL_SLEEP_TIME: Sleep time when bulk queue is full
  * - BULK_QUEUE_FULL_RETRY_COUNT: Retry count for bulk queue operations
  * - INSTRUCTIONS: MCP server instructions

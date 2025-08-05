@@ -5,7 +5,8 @@ from datetime import timedelta
 
 import pytest
 
-from embedder.read_write.bulk_queue import BulkQueue, BulkQueueConfig
+from embedder.constants import ASYNC_QUEUE_MAX_SIZE
+from embedder.read_write.bulk_queue import BulkQueue
 from embedder.text import TextInput
 from server.constants import EMBEDDER_IDLE_TIMEOUT
 from server.thread_managers.embedder_manager import EmbedderThreadManager
@@ -18,9 +19,8 @@ class TestEmbedderThreadManager:
     def setup_method(self):
         """Set up test fixtures."""
         # Create test queues
-        config = BulkQueueConfig()
-        self.read_queue = BulkQueue(maxsize=config.max_queue_size)
-        self.write_queue = BulkQueue(maxsize=config.max_queue_size)
+        self.read_queue = BulkQueue(maxsize=ASYNC_QUEUE_MAX_SIZE.value)
+        self.write_queue = BulkQueue(maxsize=ASYNC_QUEUE_MAX_SIZE.value)
 
         # Save original timeout and set shorter one for testing
         self.original_timeout = EMBEDDER_IDLE_TIMEOUT._value

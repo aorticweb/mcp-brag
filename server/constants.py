@@ -15,6 +15,8 @@ DEEP_SEARCH_RESULT_LIMIT = Constant(30, "DEEP_SEARCH_RESULT_LIMIT")
 MAX_SOURCES_IN_DEEP_SEARCH = Constant(3, "MAX_SOURCES_IN_DEEP_SEARCH")
 
 # MCP configuration
+MCP_HOST = Constant("localhost", env_var="MCP_HOST")
+MCP_PORT = Constant(8000, env_var="MCP_PORT")
 INSTRUCTIONS = Constant(
     """
 This MCP server is called "Brag".

@@ -7,9 +7,9 @@ from typing import Tuple
 from fastmcp import FastMCP
 
 from common.log import get_logger
-from embedder.constants import app_dir_path
+from embedder.constants import ASYNC_QUEUE_MAX_SIZE, app_dir_path
 from embedder.embed import Embedder
-from embedder.read_write.bulk_queue import BulkQueue, BulkQueueConfig
+from embedder.read_write.bulk_queue import BulkQueue
 from embedder.store import VectorStoreType, get_vector_store
 from embedder.store.store import CollectionState, DataSourceMap
 from embedder.text import TextInput
@@ -80,9 +80,8 @@ def start_embedder_thread(
         Tuple[BulkQueue, BulkQueue, EmbedderThreadManager]: Read queue, write queue, and thread manager
     """
     # setup transport
-    queue_config = BulkQueueConfig()
-    read_queue = BulkQueue[TextInput](maxsize=queue_config.max_queue_size)
-    write_queue = BulkQueue[TextInput](maxsize=queue_config.max_queue_size)
+    read_queue = BulkQueue[TextInput](maxsize=ASYNC_QUEUE_MAX_SIZE.value)
+    write_queue = BulkQueue[TextInput](maxsize=ASYNC_QUEUE_MAX_SIZE.value)
 
     # Create thread manager
     manager = EmbedderThreadManager(read_queue, write_queue, ingestion_state_manager)
