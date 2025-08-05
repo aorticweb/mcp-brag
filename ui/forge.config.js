@@ -1,6 +1,6 @@
 module.exports = {
   packagerConfig: {
-    name: 'BRAG [MCP]',
+    name: 'BRAG-MCP',
     icon: './src/images/icon',
     appBundleId: 'com.mcprag.app',
     appCategoryType: 'public.app-category.developer-tools',
@@ -43,7 +43,7 @@ module.exports = {
     {
       name: '@electron-forge/maker-dmg',
       config: {
-        name: 'BRAG [MCP]',
+        name: 'BRAG-MCP',
         icon: './src/images/icon.icns',
         format: 'ULFO',
       },
