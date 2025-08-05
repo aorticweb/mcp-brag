@@ -177,7 +177,7 @@ def main():
     initialize_dependencies(
         embedder_read_queue, embedder_write_queue, embedder_manager, data_source_map, ingestion_state_manager
     )
-    logger.info("MCP Corpus RAG server initialized successfully")
+    logger.info("MCP Brag RAG server initialized successfully")
     run_mcp_server(mcp, MCPMode.SSE)
 
 

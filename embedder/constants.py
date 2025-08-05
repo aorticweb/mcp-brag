@@ -4,7 +4,7 @@ from pathlib import Path
 
 from common.config.constant import Constant
 
-APP_DIR = Constant(f"{Path.home()}/.mcp-rag", env_var="MCP_RAG_APP_DIR")
+APP_DIR = Constant(f"{Path.home()}/.mcp-brag", env_var="MCP_RAG_APP_DIR")
 
 
 def app_dir_path() -> Path:

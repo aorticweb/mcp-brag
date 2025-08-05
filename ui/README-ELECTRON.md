@@ -1,4 +1,4 @@
-# MCP-RAG Electron App
+# BRAG [MCP] Electron App
 
 This is an Electron desktop application for managing RAG (Retrieval-Augmented Generation) data sources.
 

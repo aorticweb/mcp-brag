@@ -128,7 +128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="absolute inset-0 bg-primary/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 scale-150" />
                   <img
                     src={logoSvg}
-                    alt="AI Search MCP"
+                    alt="Brag [MCP]"
                     className="w-16 h-16 relative z-10 brightness-110"
                     style={{ filter: 'invert(1) brightness(1.1)' }}
                   />
@@ -137,7 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {/* Title with elegant typography */}
                 <div className="flex-1">
                   <h2 className="text-lg font-semibold text-foreground tracking-tight leading-tight">
-                    AI Search MCP
+                    Brag [MCP]
                   </h2>
                 </div>
               </div>

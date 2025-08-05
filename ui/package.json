@@ -1,6 +1,6 @@
 {
-  "name": "mcp-rag-app",
-  "productName": "MCP-RAG",
+  "name": "mcp-brag-app",
+  "productName": "BRAG [MCP]",
   "version": "1.0.0",
   "description": "MCP RAG App",
   "main": ".vite/build/main.js",

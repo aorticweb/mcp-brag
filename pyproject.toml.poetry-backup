@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "mcp-rag"
+name = "mcp-brag"
 version = "0.1.0"
 description = "ragable ai agent with rag mcp server"
 authors = ["aorticweb <aorticweb@aorticweb.com>"]

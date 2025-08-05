@@ -1,10 +1,10 @@
-# MCP-RAG
+# MCP-BRAGG
 
 A high-performance Retrieval-Augmented Generation (RAG) system built with Model Context Protocol (MCP), providing semantic search and document embedding capabilities for AI applications. The embedding model and vector database all run locally and rely on open source models and libraries.
 
 ## Overview
 
-MCP-RAG is a comprehensive document processing and semantic search solution that enables AI systems to efficiently retrieve relevant information from large document collections. It combines powerful embedding generation, vector storage, and MCP server integration to create a seamless RAG experience.
+BRAG [MCP] is a comprehensive document processing and semantic search solution that enables AI systems to efficiently retrieve relevant information from large document collections. It combines powerful embedding generation, vector storage, and MCP server integration to create a seamless RAG experience.
 
 ### Key Features
 
@@ -31,7 +31,7 @@ MCP-RAG is a comprehensive document processing and semantic search solution that
 
 ## Architecture
 
-MCP-RAG consists of three main components:
+BRAG [MCP] consists of three main components:
 
 1. **Embedder Service**: Processes documents and generates vector embeddings
 2. **MCP Server**: Provides MCP protocol interface and REST API endpoints
@@ -50,8 +50,8 @@ MCP-RAG consists of three main components:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/mcp-rag.git
-cd mcp-rag
+git clone https://github.com/yourusername/BRAG [MCP].git
+cd mcp-brag
 ```
 
 2. Install all dependencies using uv:
@@ -117,14 +117,14 @@ The system provides a comprehensive REST API for all operations. Full API docume
 
 ## MCP Integration
 
-MCP-RAG implements the Model Context Protocol, allowing seamless integration with AI assistants. The server name is "Corpus" and provides tools for document search and retrieval.
+BRAG [MCP] implements the Model Context Protocol, allowing seamless integration with AI assistants. The server name is "Brag" and provides tools for document search and retrieval.
 
 ## Development
 
 ### Project Structure
 
 ```
-mcp-rag/
+mcp-brag/
 ├── embedder/          # Document processing and embedding generation
 ├── server/            # MCP server and API implementation
 ├── transcriber/       # Audio transcription services

@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Logging function for debugging packaged apps
 const logToFile = (message: string) => {
   if (app.isPackaged) {
-    const logPath = join(app.getPath('userData'), 'mcp-rag.log');
+    const logPath = join(app.getPath('userData'), 'mcp-brag.log');
     const timestamp = new Date().toISOString();
     try {
       appendFileSync(logPath, `[${timestamp}] ${message}\n`);
@@ -37,7 +37,7 @@ const startPythonServer = () => {
     logToFile('Not using server binary, server must be run independently/manually');
     return;
   }
-  logToFile('Starting MCP-RAG server...');
+  logToFile('Starting BRAG [MCP] server...');
 
   // Use the Python executable with .pyz script
   if (app.isPackaged) {
@@ -154,7 +154,7 @@ async function createWindow() {
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    title: 'MCP-RAG',
+    title: 'BRAG [MCP]',
     webPreferences: {
       preload: app.isPackaged
         ? path.join(process.resourcesPath, 'app.asar', '.vite', 'build', 'preload.js')
@@ -191,7 +191,7 @@ async function createWindow() {
   // Create application menu with debug options
   const template: Electron.MenuItemConstructorOptions[] = [
     {
-      label: 'MCP-RAG',
+      label: 'BRAG [MCP]',
       submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'quit' }],
     },
     {
@@ -225,7 +225,7 @@ async function createWindow() {
         {
           label: 'Show Log File',
           click: () => {
-            const logPath = join(app.getPath('userData'), 'mcp-rag.log');
+            const logPath = join(app.getPath('userData'), 'mcp-brag.log');
             shell.showItemInFolder(logPath);
           },
         },

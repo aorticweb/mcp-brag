@@ -18,7 +18,7 @@ MAX_SOURCES_IN_DEEP_SEARCH = Constant(3, "MAX_SOURCES_IN_DEEP_SEARCH")
 # MCP configuration
 INSTRUCTIONS = Constant(
     """
-This MCP server is called "Corpus".
+This MCP server is called "Brag".
 The main tools are `search`, `most_relevant_files` and `deep_search`.
 
 `search`: It allows you to search for information in data sources to better answer questions that the user prompted
@@ -41,7 +41,7 @@ Use the best result and if the result sets has a lot of variance, use your best 
 
 When using search result from this tool, you should site the search results you used to answer the user prompt.
 
-If the user mentioned "Corpus" in the prompt, you HAVE to use some of the tools to answer the user prompt.
+If the user mentioned "Brag" in the prompt, you HAVE to use some of the tools to answer the user prompt.
 """,
     env_var="MCP_INSTRUCTIONS",
 )

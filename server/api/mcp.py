@@ -41,7 +41,7 @@ class MCPConfig:
     port: int = int_env_field("MCP_PORT", 8000)
 
 
-MCP_NAME = "Corpus"
+MCP_NAME = "Brag"
 
 cfg = MCPConfig()
 mcp: FastMCP = FastMCP(MCP_NAME, INSTRUCTIONS.value, host=cfg.host, port=cfg.port)
