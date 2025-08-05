@@ -30,26 +30,26 @@ def ensure_app_dir_exists():
     Creates the directory if it doesn't exist.
     """
     app_dir = app_dir_path()
-    
+
     try:
         # Create directory with parents if it doesn't exist
         app_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Verify permissions by creating a test file
         test_file = app_dir / ".permission_test"
         try:
             # Test write permission
             test_file.write_text("test")
             # Test read permission
-            content = test_file.read_text()
+            test_file.read_text()
             # Test delete permission
             test_file.unlink()
-            
+
             logger.info(f"App directory '{app_dir}' exists with proper permissions")
         except Exception as e:
             logger.error(f"App directory '{app_dir}' exists but lacks proper permissions: {e}")
             raise PermissionError(f"Insufficient permissions for app directory '{app_dir}': {e}")
-            
+
     except Exception as e:
         logger.error(f"Failed to create or access app directory '{app_dir}': {e}")
         raise
@@ -161,7 +161,7 @@ def main():
     """Main entry point for the server"""
     # Ensure app directory exists with proper permissions
     ensure_app_dir_exists()
-    
+
     ingestion_state_manager = SourceIngestionProgressManager()
     # Start embedder in background thread
     embedder_read_queue, embedder_write_queue, embedder_manager = start_embedder_thread(ingestion_state_manager)

@@ -1,7 +1,6 @@
 """Constants used throughout the server module."""
 
 from datetime import timedelta
-from pathlib import Path
 
 from common.config.constant import Constant
 from embedder.constants import app_dir_path

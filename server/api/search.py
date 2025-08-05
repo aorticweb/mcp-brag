@@ -336,7 +336,10 @@ def _search_vector_in_data_source(
 
         # if coming from a youtube video
         # we need to read the transcription file
-        if results_for_source[0]._meta["source_type"] in [ SourceType.YOUTUBE_TRANSCRIPTION, SourceType.LOCAL_AUDIO_FILE]:
+        if results_for_source[0]._meta["source_type"] in [
+            SourceType.YOUTUBE_TRANSCRIPTION,
+            SourceType.LOCAL_AUDIO_FILE,
+        ]:
             file_path = results_for_source[0]._meta["transcription_path"]
         else:
             file_path = source
