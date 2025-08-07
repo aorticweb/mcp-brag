@@ -4,6 +4,7 @@ import type { Options as ClientOptions, TDataShape, Client } from './client';
 import type {
   PostManualProcessFileAsyncData,
   PostManualProcessFileAsyncResponses,
+  PostManualProcessFileAsyncErrors,
   PostManualReprocessFileAsyncData,
   PostManualReprocessFileAsyncResponses,
   PostManualReprocessFileAsyncErrors,
@@ -67,7 +68,7 @@ export const postManualProcessFileAsync = <ThrowOnError extends boolean = false>
 ) => {
   return (options.client ?? _heyApiClient).post<
     PostManualProcessFileAsyncResponses,
-    unknown,
+    PostManualProcessFileAsyncErrors,
     ThrowOnError
   >({
     url: '/manual/process_file_async',

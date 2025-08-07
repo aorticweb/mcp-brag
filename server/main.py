@@ -20,8 +20,6 @@ from server.workers.ingestion_state_manager import (
     IngestionPhase,
     SourceIngestionProgressManager,
 )
-from embedder.constants import CONFIG_FILE
-import yaml
 
 logger = get_logger(__name__)
 

@@ -41,6 +41,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProcessFileAsyncResponse'
+        '400':
+          description: Bad request when path contains too many files or is invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /manual/reprocess_file_async:
     post:

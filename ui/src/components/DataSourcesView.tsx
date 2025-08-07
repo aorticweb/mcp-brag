@@ -20,13 +20,11 @@ import {
 } from '../server-client/sdk.gen';
 import type {
   DataSourcesResponse,
-  ProcessFileAsyncResponse,
-  ErrorResponse,
   DeleteDataSourceResponse,
   DeleteDataSourcesByNameResponse,
   DataSourceFile,
   IngestionStatusResponse,
-  IngestUrlResponse,
+  ErrorResponse,
 } from '../server-client/types.gen';
 
 type ProcessFileAsyncDataWithName = {
@@ -364,7 +362,6 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
           });
         }
       } catch (err) {
-        console.warn('Backend server not available, running in demo mode');
         const errorMessage = 'Backend server not available.';
 
         // Only show toast on initial load or if it's not a refresh
@@ -424,16 +421,17 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
           },
         });
 
-        const result = response.data as IngestUrlResponse | ErrorResponse;
-
-        if (result?.status === 'success') {
-          await fetchDataSources(true);
-          setShowAddFileModal(false);
-        } else if (result?.status === 'error') {
-          const errorMsg = `Failed to process URL: ${result.error}`;
-          // setError(errorMsg);
+        // Check if there's an error in the response
+        if (response.error) {
+          const errorData = response.error as ErrorResponse;
+          const errorMsg = errorData?.error || 'Failed to process URL';
           toast.error(errorMsg, { autoClose: 5000 });
+          return;
         }
+
+        // If we reach here, the request was successful (201 status)
+        await fetchDataSources(true);
+        setShowAddFileModal(false);
       } else {
         const filePath = await window.electron.selectFileOrDirectory();
 
@@ -447,24 +445,23 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
             body: requestBody,
           } as ProcessFileAsyncDataWithName);
 
-          const result = response.data as ProcessFileAsyncResponse | ErrorResponse;
-
-          if ('status' in result) {
-            if (result.status === 'success') {
-              startPollingIngestionStatus(filePath);
-              await fetchDataSources(true);
-              setShowAddFileModal(false);
-            } else if (result.status === 'error') {
-              const errorMsg = `Failed to start processing file: ${result.error}`;
-              // setError(errorMsg);
-              toast.error(errorMsg, { autoClose: 5000 });
-            }
+          // Check if there's an error in the response
+          if (response.error) {
+            // Handle error response
+            const errorData = response.error as ErrorResponse;
+            const errorMsg = errorData?.error || 'Failed to process file';
+            toast.error(errorMsg, { autoClose: 5000 });
+            return;
           }
+
+          // If we reach here, the request was successful (201 status)
+          startPollingIngestionStatus(filePath);
+          await fetchDataSources(true);
+          setShowAddFileModal(false);
         }
       }
-    } catch (err) {
+    } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to add data source';
-      // setError(errorMsg);
       toast.error(errorMsg, { autoClose: 5000 });
     } finally {
       setIsAddingFile(false);
@@ -696,7 +693,6 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
         setActiveDataSources(new Set(response.data.active_data_sources));
       }
     } catch (err) {
-      console.error('Failed to toggle data source active state:', err);
       const errorMsg = 'Failed to update data source active state';
       // setError(errorMsg);
       toast.error(errorMsg, { autoClose: 5000 });
@@ -721,7 +717,6 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
         setActiveDataSources(new Set(response.data.active_data_sources));
       }
     } catch (err) {
-      console.error('Failed to toggle group active state:', err);
       const errorMsg = 'Failed to update group active state';
       // setError(errorMsg);
       toast.error(errorMsg, { autoClose: 5000 });
@@ -913,15 +908,21 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
             },
           });
 
-          if (response.data && 'status' in response.data && response.data.status === 'success') {
+          // Check if there's an error in the response
+          if (response.error) {
+            totalErrors++;
+          } else if (
+            response.data &&
+            'status' in response.data &&
+            response.data.status === 'success'
+          ) {
             totalFilesReprocessed++;
             // Start polling for this file's progress
             startPollingIngestionStatus(file.source_path);
           } else {
             totalErrors++;
           }
-        } catch (err) {
-          console.error(`Failed to reprocess file ${file.source_path}:`, err);
+        } catch (err: unknown) {
           totalErrors++;
         }
       }
@@ -969,7 +970,6 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
         });
       }
     } catch (err) {
-      console.error('Bulk reprocess error:', err);
       toast.error('Failed to reprocess selected files', {
         autoClose: 5000,
       });

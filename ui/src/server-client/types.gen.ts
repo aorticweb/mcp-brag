@@ -249,6 +249,16 @@ export type PostManualProcessFileAsyncData = {
   url: '/manual/process_file_async';
 };
 
+export type PostManualProcessFileAsyncErrors = {
+  /**
+   * Bad request when path contains too many files or is invalid
+   */
+  400: ErrorResponse;
+};
+
+export type PostManualProcessFileAsyncError =
+  PostManualProcessFileAsyncErrors[keyof PostManualProcessFileAsyncErrors];
+
 export type PostManualProcessFileAsyncResponses = {
   /**
    * File processing started successfully
