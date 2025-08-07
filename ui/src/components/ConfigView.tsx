@@ -245,6 +245,16 @@ export const ConfigView: React.FC<ConfigViewProps> = ({
         <div className="mb-8">
           <h1 className="text-2xl font-semibold tracking-tight mb-2">Configuration</h1>
           <p className="text-foreground-secondary">Manage application settings and parameters</p>
+          <div className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+            <p className="text-sm text-foreground-secondary">
+              <span className="font-medium">Note:</span> Read-only (frozen) configurations can be
+              updated by editing the YAML file specified in the{' '}
+              <code className="px-1 py-0.5 bg-background rounded text-xs font-mono">
+                CONFIG_FILE
+              </code>{' '}
+              configuration.
+            </p>
+          </div>
         </div>
 
         {/* Controls Bar */}

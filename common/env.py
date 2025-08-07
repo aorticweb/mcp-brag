@@ -41,5 +41,8 @@ def load_env(file_path: Optional[str] = None):
         logger.warning(f"Error loading env file {file_path}: {e}")
         return
 
+    if data is None:
+        return
+
     for key, value in data.items():
         os.environ[key] = str(value)

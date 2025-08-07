@@ -628,6 +628,10 @@ components:
           additionalProperties:
             $ref: '#/components/schemas/ConfigItem'
           example:
+            CONFIG_FILE:
+              value: "/path/to/config.yaml"
+              type: "str"
+              frozen: true
             SEARCH_RESULT_LIMIT:
               value: 5
               type: "int"

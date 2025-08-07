@@ -9,6 +9,7 @@ from embedder.constants import (
     ASYNC_QUEUE_READ_SLEEP,
     BULK_QUEUE_FULL_RETRY_COUNT,
     BULK_QUEUE_FULL_SLEEP_TIME,
+    CONFIG_FILE,
     EMBEDDING_SIZE,
     SQLITE_DB_LOCATION,
     VECTORIZER_MODEL_PATH,
@@ -48,6 +49,7 @@ editable_name_to_config_map: Dict[str, Constant[Any]] = {
 }
 
 frozen_config_map: Dict[str, Constant[Any]] = {
+    "CONFIG_FILE": CONFIG_FILE,
     "MCP_HOST": MCP_HOST,
     "MCP_PORT": MCP_PORT,
     "AUDIO_TRANSCRIPTION_DIR": AUDIO_TRANSCRIPTION_DIR,

@@ -20,6 +20,8 @@ from server.workers.ingestion_state_manager import (
     IngestionPhase,
     SourceIngestionProgressManager,
 )
+from embedder.constants import CONFIG_FILE
+import yaml
 
 logger = get_logger(__name__)
 
@@ -46,6 +48,9 @@ def ensure_app_dir_exists():
             test_file.unlink()
 
             logger.info(f"App directory '{app_dir}' exists with proper permissions")
+            config_file = app_dir / "config.yaml"
+            if not config_file.exists():
+                config_file.write_text("")
         except Exception as e:
             logger.error(f"App directory '{app_dir}' exists but lacks proper permissions: {e}")
             raise PermissionError(f"Insufficient permissions for app directory '{app_dir}': {e}")
