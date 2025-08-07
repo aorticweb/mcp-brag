@@ -303,6 +303,14 @@ app.whenReady().then(() => {
       isPackaged: app.isPackaged,
     };
   });
+
+  // Add handler to restart the entire application
+  ipcMain.handle('restart-app', () => {
+    logToFile('App restart requested via IPC');
+    app.relaunch();
+    app.quit();
+  });
+
   startPythonServer();
   createWindow();
 

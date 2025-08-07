@@ -22,6 +22,7 @@ import Time from './Time';
 import { Gear } from './Gear';
 import { Microphone } from './Microphone';
 import TrashIcon from './TrashIcon';
+import RestartIcon from './Restart';
 
 export {
   ArrowDown,
@@ -42,6 +43,7 @@ export {
   Microphone,
   More,
   Refresh,
+  RestartIcon,
   SensitiveHidden,
   SensitiveVisible,
   Send,

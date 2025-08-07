@@ -998,7 +998,13 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [filteredSources, selectedGroups.size, selectedFiles.size, selectAllGroups, deselectAllGroups]);
+  }, [
+    filteredSources,
+    selectedGroups.size,
+    selectedFiles.size,
+    selectAllGroups,
+    deselectAllGroups,
+  ]);
 
   if (loading) {
     return (
@@ -1492,7 +1498,9 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                                   file.status === 'need_processing' && 'text-warning'
                                 )}
                               >
-                                {file.status === 'need_processing' ? 'Need Processing' : file.status}
+                                {file.status === 'need_processing'
+                                  ? 'Need Processing'
+                                  : file.status}
                               </span>
                             </div>
                             {/* Show progress for individual file if processing */}

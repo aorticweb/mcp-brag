@@ -21,6 +21,7 @@ embedder = [
     "torch>=2.7.0",
 ]
 server = [
+    "dotenv>=0.9.9",
     "fastmcp>=2.5.1",
     "faiss-cpu>=1.11.0",
     "pypdf2>=3.0.1",
@@ -37,6 +38,7 @@ server = [
     "numba>=0.61.2",
     "openai-whisper>=20250625",
     "parakeet-mlx>=0.3.5",
+    "pyyaml>=6.0.1",
 ]
 dev = [
     "anyio>=4.2.0",

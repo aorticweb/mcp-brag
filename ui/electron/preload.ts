@@ -4,6 +4,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electron', {
   selectFileOrDirectory: () => ipcRenderer.invoke('select-file-or-directory'),
+  restartApp: () => ipcRenderer.invoke('restart-app'),
 });
 
 // Add TypeScript types for the exposed API
@@ -11,6 +12,7 @@ declare global {
   interface Window {
     electron: {
       selectFileOrDirectory: () => Promise<string | null>;
+      restartApp: () => Promise<void>;
     };
   }
 }

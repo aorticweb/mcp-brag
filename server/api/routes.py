@@ -75,6 +75,7 @@ async def process_file_async_api(request: Request) -> JSONResponse:
     asyncio.get_event_loop().run_in_executor(None, _process_files_async, file_paths, data.get("source_name"))
     return JSONResponse({"status": "success"}, status_code=201)
 
+
 async def re_process_file_async_api(request: Request) -> JSONResponse:
     """
     API endpoint to re-process a file asynchronously for embedding
@@ -91,6 +92,7 @@ async def re_process_file_async_api(request: Request) -> JSONResponse:
         raise MCPError(f"File {file_path} does not exist", code=400)
     asyncio.get_event_loop().run_in_executor(None, _process_files_async, [file_path], None, True)
     return JSONResponse({"status": "success"}, status_code=201)
+
 
 async def process_url_async_api(request: Request) -> JSONResponse:
     """

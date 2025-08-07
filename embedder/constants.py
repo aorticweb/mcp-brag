@@ -4,12 +4,21 @@ from datetime import timedelta
 from pathlib import Path
 
 from common.config.constant import Constant
+from common.env import load_env
 
 APP_DIR = Constant(f"{Path.home()}/.mcp-brag", env_var="MCP_RAG_APP_DIR")
 
 
 def app_dir_path() -> Path:
     return Path(APP_DIR.value)
+
+
+CONFIG_FILE = Constant(str(app_dir_path() / "config.yaml"), env_var="BRAG_CONFIG_FILE")
+
+# This has to run here since the constants are only instantiated once
+# so to override env variables with value from a file, we have to do THIS
+# before the constants are instantiated
+load_env(CONFIG_FILE.value)
 
 
 # Vectorizer configuration
