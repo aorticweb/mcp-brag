@@ -259,6 +259,38 @@ export type PostManualProcessFileAsyncResponses = {
 export type PostManualProcessFileAsyncResponse =
   PostManualProcessFileAsyncResponses[keyof PostManualProcessFileAsyncResponses];
 
+export type PostManualReprocessFileAsyncData = {
+  body: {
+    /**
+     * Path to the file to reprocess (must be an existing file, not a directory)
+     */
+    file_path: string;
+  };
+  path?: never;
+  query?: never;
+  url: '/manual/reprocess_file_async';
+};
+
+export type PostManualReprocessFileAsyncErrors = {
+  /**
+   * Bad request when file does not exist or is a directory
+   */
+  400: ErrorResponse;
+};
+
+export type PostManualReprocessFileAsyncError =
+  PostManualReprocessFileAsyncErrors[keyof PostManualReprocessFileAsyncErrors];
+
+export type PostManualReprocessFileAsyncResponses = {
+  /**
+   * File reprocessing started successfully
+   */
+  201: ProcessFileAsyncResponse;
+};
+
+export type PostManualReprocessFileAsyncResponse =
+  PostManualReprocessFileAsyncResponses[keyof PostManualReprocessFileAsyncResponses];
+
 export type PostManualSearchFileData = {
   body: {
     /**

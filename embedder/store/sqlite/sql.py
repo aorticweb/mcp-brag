@@ -382,21 +382,28 @@ def delete_collection_by_name(conn: sqlite3.Connection, source_name: str):
     return True
 
 
-def delete_all_embeddings(conn: sqlite3.Connection):
+def delete_embeddings(conn: sqlite3.Connection, source: Optional[str] = None):
     """Delete all embeddings.
 
     Args:
         conn: SQLite connection
-        source_path: The collection source path
+        source: The collection source path (optional)
     """
-
-    # Delete the embeddings
-    conn.execute(
-        """
-        DROP TABLE IF EXISTS embeddings;
-        """,
-    )
-    create_embeddings_table(conn, EMBEDDING_SIZE.value)
+    if source is not None:
+        conn.execute(
+            """
+            DELETE FROM embeddings WHERE collection = ?;
+            """,
+            (source,),
+        )
+    else:
+        # Delete the embeddings
+        conn.execute(
+            """
+            DROP TABLE IF EXISTS embeddings;
+            """,
+        )
+        create_embeddings_table(conn, EMBEDDING_SIZE.value)
     conn.commit()
 
 

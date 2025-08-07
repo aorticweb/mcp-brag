@@ -4,6 +4,9 @@ import type { Options as ClientOptions, TDataShape, Client } from './client';
 import type {
   PostManualProcessFileAsyncData,
   PostManualProcessFileAsyncResponses,
+  PostManualReprocessFileAsyncData,
+  PostManualReprocessFileAsyncResponses,
+  PostManualReprocessFileAsyncErrors,
   PostManualSearchFileData,
   PostManualSearchFileResponses,
   GetManualSystemStatusData,
@@ -68,6 +71,27 @@ export const postManualProcessFileAsync = <ThrowOnError extends boolean = false>
     ThrowOnError
   >({
     url: '/manual/process_file_async',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+};
+
+/**
+ * Reprocess a file for embedding asynchronously
+ * Starts reprocessing a single file to regenerate embeddings in the background and returns immediately. This is useful for updating embeddings after changes to the file content. Unlike process_file_async, this endpoint only accepts individual files, not directories.
+ */
+export const postManualReprocessFileAsync = <ThrowOnError extends boolean = false>(
+  options: Options<PostManualReprocessFileAsyncData, ThrowOnError>
+) => {
+  return (options.client ?? _heyApiClient).post<
+    PostManualReprocessFileAsyncResponses,
+    PostManualReprocessFileAsyncErrors,
+    ThrowOnError
+  >({
+    url: '/manual/reprocess_file_async',
     ...options,
     headers: {
       'Content-Type': 'application/json',

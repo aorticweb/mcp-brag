@@ -379,12 +379,12 @@ class DataSourceMap(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def delete_all_vectors(self) -> int:
+    def delete_vectors(self, source: Optional[str] = None) -> int:
         """
-        Delete all vectors for a specific data source
+        Delete all vectors for a specific data source or all sources if source is None
 
         Args:
-            source: Source identifier whose vectors should be deleted
+            source: Source identifier whose vectors should be deleted (optional)
 
         Returns:
             int: Number of vectors deleted

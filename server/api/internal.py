@@ -25,22 +25,26 @@ from server.workers.ingestion_state_manager import IngestionPhase
 logger = get_logger(__name__)
 
 
-def _process_file_async(file_paths: List[str], source_name: Optional[str] = None):
+def _process_files_async(file_paths: List[str], source_name: Optional[str] = None, is_reprocessing: bool = False):
     """
     Process files asynchronously for embedding and storage in vector database
 
     Args:
         file_paths: List of file paths to process
         source_name: Optional name to group files under
+        is_reprocessing: Whether to reprocess the files
     """
     transcription_queue = get_transcription_queue()
     embedder_read_queue = get_embedder_read_queue()
     data_source_map = get_data_source_map()
 
     for file_path in file_paths:
-        if data_source_map.exists(file_path):
+        if data_source_map.exists(file_path) and not is_reprocessing:
             logger.debug(f"Data source {file_path} already exists, deleting it prior to ingestion")
             _delete_data_source(file_path)
+
+        if is_reprocessing:
+            data_source_map.delete_vectors(file_path)
 
         try:
             reader = ReaderFactory.create_reader(file_path)
@@ -52,8 +56,11 @@ def _process_file_async(file_paths: List[str], source_name: Optional[str] = None
                 data_source_map.fail_ingestion_process_callback(file_path),
             )
             progress_manager.add_phase(file_path, IngestionPhase.INITIALIZATION, total=1)
-            # Create collection in vector store
-            data_source_map.create(file_path, reader.source_type(), source_name, CollectionState.PROCESSING)
+            if is_reprocessing:
+                data_source_map.set_state(file_path, CollectionState.PROCESSING)
+            else:
+                # Create collection in vector store
+                data_source_map.create(file_path, reader.source_type(), source_name, CollectionState.PROCESSING)
             # Update ingestion state to embedding phase
             progress_manager.increment_phase_progress(file_path, IngestionPhase.INITIALIZATION, 1)
 
@@ -441,7 +448,7 @@ def _clear_vectors() -> Dict[str, Any]:
             continue
         data_source_map.set_state(source, CollectionState.NEED_PROCESSING)
 
-    data_source_map.delete_all_vectors()
+    data_source_map.delete_vectors()
 
     return {
         "status": "success",

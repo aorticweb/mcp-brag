@@ -16,6 +16,7 @@ import {
   getManualActiveDataSources,
   postManualMarkDataSourcesAsActive,
   postManualMarkDataSourcesAsInactive,
+  postManualReprocessFileAsync,
 } from '../server-client/sdk.gen';
 import type {
   DataSourcesResponse,
@@ -46,7 +47,7 @@ type GroupedDataSource = {
     | 'completed'
     | 'failed'
     | 'partially_successful'
-    | 'need_reprocessing';
+    | 'need_processing';
   processingProgress?: {
     phases?: Array<{
       phase:
@@ -85,13 +86,13 @@ function groupDataSourcesByName(dataSources: DataSourceFile[]): GroupedDataSourc
       | 'completed'
       | 'failed'
       | 'partially_successful'
-      | 'need_reprocessing';
+      | 'need_processing';
     if (sortedFiles.some((file) => file.status === 'processing')) {
       aggregatedStatus = 'processing';
     } else if (sortedFiles.every((file) => file.status === 'completed')) {
       aggregatedStatus = 'completed';
     } else if (sortedFiles.some((file) => file.status === 'need_processing')) {
-      aggregatedStatus = 'need_reprocessing';
+      aggregatedStatus = 'need_processing';
     } else if (
       sortedFiles.some((file) => file.status === 'completed') &&
       sortedFiles.some((file) => file.status === 'failed')
@@ -163,6 +164,7 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [dataSourceToDelete, setDataSourceToDelete] = useState<DataSourceFile | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<GroupedDataSource | null>(null);
+  const [isReprocessing, setIsReprocessing] = useState(false);
   const [ingestionProgress, setIngestionProgress] = useState<{
     [key: string]: {
       phases?: Array<{
@@ -189,6 +191,7 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const hasShownFetchErrorRef = useRef(false);
 
@@ -513,39 +516,32 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
 
     try {
       if (groupToDelete) {
-        // Handle bulk delete
-        if (selectedGroups.size > 0) {
-          // Delete each selected group
-          const groupsToDelete = filteredSources.filter((g) => selectedGroups.has(g.name));
+        // Handle bulk delete of selected files
+        if (selectedFiles.size > 0) {
+          // Delete each selected file individually
+          const filesToDelete = dataSources.filter((ds) => selectedFiles.has(ds.source_path));
+          let deletedCount = 0;
 
-          for (const group of groupsToDelete) {
-            if (group.files.length === 1) {
-              // Single file group - use delete_data_source endpoint
-              const response = await postManualDeleteDataSource({
-                body: { source: group.files[0].source_path },
-              });
+          for (const file of filesToDelete) {
+            const response = await postManualDeleteDataSource({
+              body: { source: file.source_path },
+            });
 
-              const result = response.data as DeleteDataSourceResponse;
+            const result = response.data as DeleteDataSourceResponse;
 
-              if (result.status === 'success' && result.data_source_was_found) {
-                const file = group.files[0];
-                if (pollIntervals[file.source_path]) {
-                  clearInterval(pollIntervals[file.source_path]);
-                }
-              }
-            } else {
-              // Multi-file group - use delete_data_sources_by_name endpoint
-              const response = await postManualDeleteDataSourcesByName({
-                body: { source_name: group.name },
-              });
-
-              const result = response.data as DeleteDataSourcesByNameResponse;
-
-              if (result.status === 'success') {
-                group.files.forEach((file) => {
-                  if (pollIntervals[file.source_path]) {
-                    clearInterval(pollIntervals[file.source_path]);
-                  }
+            if (result.status === 'success' && result.data_source_was_found) {
+              deletedCount++;
+              if (pollIntervals[file.source_path]) {
+                clearInterval(pollIntervals[file.source_path]);
+                setPollIntervals((prev) => {
+                  const newIntervals = { ...prev };
+                  delete newIntervals[file.source_path];
+                  return newIntervals;
+                });
+                setIngestionProgress((prev) => {
+                  const newProgress = { ...prev };
+                  delete newProgress[file.source_path];
+                  return newProgress;
                 });
               }
             }
@@ -553,10 +549,11 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
 
           // Clear selection after bulk delete
           setSelectedGroups(new Set());
+          setSelectedFiles(new Set());
           setIsSelectionMode(false);
 
           await fetchDataSources(true);
-          toast.success(`Deleted ${groupsToDelete.length} data source groups`, {
+          toast.success(`Deleted ${deletedCount} file${deletedCount !== 1 ? 's' : ''}`, {
             autoClose: 2000,
           });
         } else {
@@ -744,15 +741,76 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
   };
 
   const toggleGroupSelection = (groupName: string) => {
+    const group = groupedSources.find((g) => g.name === groupName);
+    if (!group) return;
+
     setSelectedGroups((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(groupName)) {
         newSet.delete(groupName);
+        // Also deselect all files in this group
+        setSelectedFiles((prevFiles) => {
+          const newFiles = new Set(prevFiles);
+          group.files.forEach((file) => {
+            newFiles.delete(file.source_path);
+          });
+          return newFiles;
+        });
       } else {
         newSet.add(groupName);
+        // Also select all files in this group
+        setSelectedFiles((prevFiles) => {
+          const newFiles = new Set(prevFiles);
+          group.files.forEach((file) => {
+            newFiles.add(file.source_path);
+          });
+          return newFiles;
+        });
       }
       // Enter selection mode when selecting items
-      if (newSet.size > 0) {
+      if (newSet.size > 0 || selectedFiles.size > 0) {
+        setIsSelectionMode(true);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleFileSelection = (filePath: string, groupName: string) => {
+    const group = groupedSources.find((g) => g.name === groupName);
+    if (!group) return;
+
+    setSelectedFiles((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(filePath)) {
+        newSet.delete(filePath);
+
+        // Check if we should deselect the group
+        const groupFilePaths = group.files.map((f) => f.source_path);
+        const hasSelectedFile = groupFilePaths.some((fp) => newSet.has(fp));
+        if (!hasSelectedFile) {
+          setSelectedGroups((prevGroups) => {
+            const newGroups = new Set(prevGroups);
+            newGroups.delete(groupName);
+            return newGroups;
+          });
+        }
+      } else {
+        newSet.add(filePath);
+
+        // Check if we should select the group
+        const groupFilePaths = group.files.map((f) => f.source_path);
+        const allFilesSelected = groupFilePaths.every((fp) => fp === filePath || newSet.has(fp));
+        if (allFilesSelected) {
+          setSelectedGroups((prevGroups) => {
+            const newGroups = new Set(prevGroups);
+            newGroups.add(groupName);
+            return newGroups;
+          });
+        }
+      }
+
+      // Enter selection mode when selecting items
+      if (newSet.size > 0 || selectedGroups.size > 0) {
         setIsSelectionMode(true);
       }
       return newSet;
@@ -799,23 +857,28 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
   const selectAllGroups = useCallback(() => {
     const allGroupNames = filteredSources.map((g) => g.name);
     setSelectedGroups(new Set(allGroupNames));
+    // Also select all files
+    const allFilePaths = filteredSources.flatMap((g) => g.files.map((f) => f.source_path));
+    setSelectedFiles(new Set(allFilePaths));
     setIsSelectionMode(true);
   }, [filteredSources]);
 
   const deselectAllGroups = useCallback(() => {
     setSelectedGroups(new Set());
+    setSelectedFiles(new Set());
     setIsSelectionMode(false);
   }, []);
 
   const handleBulkDelete = () => {
-    if (selectedGroups.size === 0) return;
+    if (selectedGroups.size === 0 && selectedFiles.size === 0) return;
 
-    // Create a combined group for bulk delete confirmation
-    const groupsToDelete = filteredSources.filter((g) => selectedGroups.has(g.name));
-    const totalVectors = groupsToDelete.reduce((sum, g) => sum + g.totalVectorCount, 0);
+    // Calculate total files and vectors to delete
+    const filesToDelete = dataSources.filter((ds) => selectedFiles.has(ds.source_path));
+    const totalVectors = filesToDelete.reduce((sum, f) => sum + f.vector_count, 0);
+    const totalFiles = selectedFiles.size;
 
     setGroupToDelete({
-      name: `${selectedGroups.size} groups`,
+      name: `${totalFiles} ${totalFiles === 1 ? 'file' : 'files'}`,
       files: [],
       totalVectorCount: totalVectors,
       totalDimension: 0,
@@ -824,6 +887,95 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
     });
     setDataSourceToDelete(null);
     setShowDeleteConfirmation(true);
+  };
+
+  const handleBulkReprocess = async () => {
+    if (selectedGroups.size === 0 && selectedFiles.size === 0) return;
+
+    setIsReprocessing(true);
+    try {
+      const filesToReprocess = dataSources.filter((ds) => selectedFiles.has(ds.source_path));
+      let totalFilesReprocessed = 0;
+      let totalErrors = 0;
+      let skippedYouTubeFiles = 0;
+
+      for (const file of filesToReprocess) {
+        // Skip YouTube data sources
+        if (file.source_path.includes('youtube.com') || file.source_path.includes('youtu.be')) {
+          skippedYouTubeFiles++;
+          continue;
+        }
+        try {
+          const response = await postManualReprocessFileAsync({
+            body: {
+              file_path: file.source_path,
+              ...(file.source_name && { source_name: file.source_name }),
+            },
+          });
+
+          if (response.data && 'status' in response.data && response.data.status === 'success') {
+            totalFilesReprocessed++;
+            // Start polling for this file's progress
+            startPollingIngestionStatus(file.source_path);
+          } else {
+            totalErrors++;
+          }
+        } catch (err) {
+          console.error(`Failed to reprocess file ${file.source_path}:`, err);
+          totalErrors++;
+        }
+      }
+
+      // Clear selection after reprocessing
+      setSelectedGroups(new Set());
+      setSelectedFiles(new Set());
+      setIsSelectionMode(false);
+
+      // Refresh data sources
+      await fetchDataSources(true);
+
+      // Show appropriate toast message
+      if (skippedYouTubeFiles > 0 && totalFilesReprocessed === 0 && totalErrors === 0) {
+        toast.info(
+          `Skipped ${skippedYouTubeFiles} YouTube file${skippedYouTubeFiles > 1 ? 's' : ''} (YouTube sources cannot be reprocessed)`,
+          {
+            autoClose: 4000,
+          }
+        );
+      } else if (totalFilesReprocessed > 0 && totalErrors === 0 && skippedYouTubeFiles === 0) {
+        toast.success(
+          `Started reprocessing ${totalFilesReprocessed} file${totalFilesReprocessed > 1 ? 's' : ''}`,
+          {
+            autoClose: 3000,
+          }
+        );
+      } else if (totalFilesReprocessed > 0 && totalErrors === 0 && skippedYouTubeFiles > 0) {
+        toast.success(
+          `Started reprocessing ${totalFilesReprocessed} file${totalFilesReprocessed > 1 ? 's' : ''}, skipped ${skippedYouTubeFiles} YouTube file${skippedYouTubeFiles > 1 ? 's' : ''}`,
+          {
+            autoClose: 4000,
+          }
+        );
+      } else if (totalFilesReprocessed > 0 && totalErrors > 0) {
+        toast.warning(
+          `Reprocessed ${totalFilesReprocessed} file${totalFilesReprocessed > 1 ? 's' : ''}, ${totalErrors} error${totalErrors > 1 ? 's' : ''}${skippedYouTubeFiles > 0 ? `, skipped ${skippedYouTubeFiles} YouTube file${skippedYouTubeFiles > 1 ? 's' : ''}` : ''}`,
+          {
+            autoClose: 5000,
+          }
+        );
+      } else if (totalFilesReprocessed === 0 && totalErrors === 0 && skippedYouTubeFiles === 0) {
+        toast.error(`Failed to reprocess files`, {
+          autoClose: 5000,
+        });
+      }
+    } catch (err) {
+      console.error('Bulk reprocess error:', err);
+      toast.error('Failed to reprocess selected files', {
+        autoClose: 5000,
+      });
+    } finally {
+      setIsReprocessing(false);
+    }
   };
 
   // Handle keyboard shortcuts for selection
@@ -839,14 +991,14 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
         }
       }
       // Escape to cancel selection
-      if (e.key === 'Escape' && selectedGroups.size > 0) {
+      if (e.key === 'Escape' && (selectedGroups.size > 0 || selectedFiles.size > 0)) {
         deselectAllGroups();
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [filteredSources, selectedGroups.size, selectAllGroups, deselectAllGroups]);
+  }, [filteredSources, selectedGroups.size, selectedFiles.size, selectAllGroups, deselectAllGroups]);
 
   if (loading) {
     return (
@@ -864,7 +1016,7 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
       <div
         className={cn(
           'max-w-7xl mx-auto px-6 py-8 transition-all duration-300',
-          selectedGroups.size > 0 && 'pb-28'
+          (selectedGroups.size > 0 || selectedFiles.size > 0) && 'pb-28'
         )}
       >
         {/* Header */}
@@ -903,7 +1055,7 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                   (g) =>
                     g.aggregatedStatus === 'processing' ||
                     g.aggregatedStatus === 'partially_successful' ||
-                    g.aggregatedStatus === 'need_reprocessing'
+                    g.aggregatedStatus === 'need_processing'
                 ).length
               }
             </p>
@@ -1007,7 +1159,7 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
               <option value="processing">Processing</option>
               <option value="failed">Failed</option>
               <option value="partially_successful">Partial</option>
-              <option value="need_reprocessing">Need Reprocessing</option>
+              <option value="need_processing">Need Processing</option>
             </select>
 
             <Button
@@ -1031,6 +1183,11 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                 const isExpanded = expandedGroups.has(group.name);
                 const isHovered = hoveredRow === group.name;
                 const isGroupActive = group.files.some((f) => activeDataSources.has(f.source_path));
+                const groupFilePaths = group.files.map((f) => f.source_path);
+                const selectedFilesInGroup = groupFilePaths.filter((fp) => selectedFiles.has(fp));
+                const isPartiallySelected =
+                  selectedFilesInGroup.length > 0 &&
+                  selectedFilesInGroup.length < group.files.length;
 
                 return (
                   <div key={group.name}>
@@ -1038,13 +1195,13 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                       className={cn(
                         'transition-all duration-200',
                         isHovered && 'bg-background-elevated',
-                        hasMultipleFiles && !isSelectionMode && 'cursor-pointer',
+                        hasMultipleFiles && 'cursor-pointer',
                         selectedGroups.has(group.name) && 'bg-primary/5'
                       )}
                       onMouseEnter={() => setHoveredRow(group.name)}
                       onMouseLeave={() => setHoveredRow(null)}
                       onClick={() => {
-                        if (!isSelectionMode && hasMultipleFiles) {
+                        if (hasMultipleFiles) {
                           toggleGroupExpansion(group.name);
                         }
                       }}
@@ -1078,33 +1235,31 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                                     {group.files.length}
                                   </span>
                                 </div>
-                                {!isSelectionMode && (
-                                  <div
+                                <div
+                                  className={cn(
+                                    'absolute -bottom-1 left-1/2 transform -translate-x-1/2 transition-all duration-200',
+                                    isExpanded
+                                      ? 'opacity-100'
+                                      : 'opacity-0 group-hover/icon:opacity-100'
+                                  )}
+                                >
+                                  <svg
                                     className={cn(
-                                      'absolute -bottom-1 left-1/2 transform -translate-x-1/2 transition-all duration-200',
-                                      isExpanded
-                                        ? 'opacity-100'
-                                        : 'opacity-0 group-hover/icon:opacity-100'
+                                      'w-3 h-3 text-foreground-tertiary transition-transform duration-200',
+                                      isExpanded && 'rotate-180'
                                     )}
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
                                   >
-                                    <svg
-                                      className={cn(
-                                        'w-3 h-3 text-foreground-tertiary transition-transform duration-200',
-                                        isExpanded && 'rotate-180'
-                                      )}
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={3}
-                                        d="M19 9l-7 7-7-7"
-                                      />
-                                    </svg>
-                                  </div>
-                                )}
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={3}
+                                      d="M19 9l-7 7-7-7"
+                                    />
+                                  </svg>
+                                </div>
                               </>
                             )}
                           </div>
@@ -1137,13 +1292,13 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                                   group.aggregatedStatus === 'failed' && 'text-destructive',
                                   group.aggregatedStatus === 'partially_successful' &&
                                     'text-warning',
-                                  group.aggregatedStatus === 'need_reprocessing' && 'text-warning'
+                                  group.aggregatedStatus === 'need_processing' && 'text-warning'
                                 )}
                               >
                                 {group.aggregatedStatus === 'partially_successful'
                                   ? 'Partial'
-                                  : group.aggregatedStatus === 'need_reprocessing'
-                                    ? 'Need Reprocessing'
+                                  : group.aggregatedStatus === 'need_processing'
+                                    ? 'Need Processing'
                                     : group.aggregatedStatus}
                               </p>
                             </div>
@@ -1169,24 +1324,36 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                                 className={cn(
                                   'w-5 h-5 border-2 rounded transition-all duration-200',
                                   'hover:border-primary/50',
-                                  selectedGroups.has(group.name)
+                                  selectedGroups.has(group.name) || isPartiallySelected
                                     ? 'bg-primary border-primary'
                                     : 'bg-background border-border-strong'
                                 )}
                               >
-                                {selectedGroups.has(group.name) && (
+                                {(selectedGroups.has(group.name) || isPartiallySelected) && (
                                   <svg
                                     className="w-full h-full text-white p-0.5"
                                     viewBox="0 0 24 24"
                                     fill="none"
                                   >
-                                    <path
-                                      d="M20 6L9 17L4 12"
-                                      stroke="currentColor"
-                                      strokeWidth="3"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    />
+                                    {isPartiallySelected && !selectedGroups.has(group.name) ? (
+                                      // Minus sign for indeterminate state
+                                      <path
+                                        d="M5 12h14"
+                                        stroke="currentColor"
+                                        strokeWidth="3"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                    ) : (
+                                      // Check mark for fully selected
+                                      <path
+                                        d="M20 6L9 17L4 12"
+                                        stroke="currentColor"
+                                        strokeWidth="3"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                    )}
                                   </svg>
                                 )}
                               </div>
@@ -1261,10 +1428,51 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                             key={file.source_path}
                             className={cn(
                               'px-6 py-3 flex items-center gap-4',
-                              index !== group.files.length - 1 && 'border-b border-border'
+                              index !== group.files.length - 1 && 'border-b border-border',
+                              selectedFiles.has(file.source_path) && 'bg-primary/5'
                             )}
                           >
                             <div className="w-12" />
+                            {/* Checkbox for individual file selection */}
+                            <label
+                              className="relative inline-flex items-center cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                className="sr-only peer"
+                                checked={selectedFiles.has(file.source_path)}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  toggleFileSelection(file.source_path, group.name);
+                                }}
+                              />
+                              <div
+                                className={cn(
+                                  'w-5 h-5 border-2 rounded transition-all duration-200',
+                                  'hover:border-primary/50',
+                                  selectedFiles.has(file.source_path)
+                                    ? 'bg-primary border-primary'
+                                    : 'bg-background border-border-strong'
+                                )}
+                              >
+                                {selectedFiles.has(file.source_path) && (
+                                  <svg
+                                    className="w-full h-full text-white p-0.5"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                  >
+                                    <path
+                                      d="M20 6L9 17L4 12"
+                                      stroke="currentColor"
+                                      strokeWidth="3"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                  </svg>
+                                )}
+                              </div>
+                            </label>
                             <div className="w-10 h-10 bg-background rounded-lg flex items-center justify-center border border-border/50">
                               <Document className="w-5 h-5 text-foreground-tertiary" />
                             </div>
@@ -1280,10 +1488,11 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                                   'capitalize',
                                   file.status === 'completed' && 'text-accent-success',
                                   file.status === 'processing' && 'text-warning',
-                                  file.status === 'failed' && 'text-destructive'
+                                  file.status === 'failed' && 'text-destructive',
+                                  file.status === 'need_processing' && 'text-warning'
                                 )}
                               >
-                                {file.status}
+                                {file.status === 'need_processing' ? 'Need Processing' : file.status}
                               </span>
                             </div>
                             {/* Show progress for individual file if processing */}
@@ -1297,7 +1506,10 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                                 </div>
                               )}
                             <label
-                              className="relative inline-flex items-center cursor-pointer"
+                              className={cn(
+                                'relative inline-flex items-center cursor-pointer transition-opacity duration-200',
+                                isSelectionMode && 'opacity-0 pointer-events-none'
+                              )}
                               onClick={(e) => e.stopPropagation()}
                             >
                               <input
@@ -1313,7 +1525,10 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
+                              className={cn(
+                                'h-8 w-8 transition-all duration-200',
+                                isSelectionMode && 'opacity-0 pointer-events-none'
+                              )}
                               onClick={() => handleDeleteDataSource(file)}
                             >
                               <TrashIcon className="w-3.5 h-3.5 text-destructive" />
@@ -1519,7 +1734,7 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
       <div
         className={cn(
           'fixed bottom-0 left-0 right-0 z-40 transition-all duration-300 ease-out',
-          selectedGroups.size > 0 ? 'translate-y-0' : 'translate-y-full'
+          selectedGroups.size > 0 || selectedFiles.size > 0 ? 'translate-y-0' : 'translate-y-full'
         )}
       >
         <div className="bg-background/95 backdrop-blur-xl border-t border-border shadow-[0_-8px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_-8px_24px_rgba(0,0,0,0.4)]">
@@ -1527,13 +1742,13 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-foreground">
-                  {selectedGroups.size} {selectedGroups.size === 1 ? 'group' : 'groups'} selected
+                  {selectedFiles.size} {selectedFiles.size === 1 ? 'file' : 'files'} selected
                 </span>
                 <span className="text-sm text-foreground-secondary">
                   (
-                  {filteredSources
-                    .filter((g) => selectedGroups.has(g.name))
-                    .reduce((sum, g) => sum + g.totalVectorCount, 0)
+                  {dataSources
+                    .filter((ds) => selectedFiles.has(ds.source_path))
+                    .reduce((sum, ds) => sum + ds.vector_count, 0)
                     .toLocaleString()}{' '}
                   vectors)
                 </span>
@@ -1552,13 +1767,36 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                 <div className="w-px h-6 bg-border mx-2" />
 
                 <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBulkReprocess}
+                  disabled={isReprocessing}
+                  className="text-foreground"
+                >
+                  <svg
+                    className={cn('w-4 h-4 mr-1.5', isReprocessing && 'animate-spin')}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  {isReprocessing ? 'Reprocessing...' : 'Reprocess'}
+                </Button>
+
+                <Button
                   variant="destructive"
                   size="sm"
                   onClick={handleBulkDelete}
                   className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600"
                 >
                   <TrashIcon className="w-4 h-4 mr-1.5" />
-                  Delete {selectedGroups.size === 1 ? 'Group' : `${selectedGroups.size} Groups`}
+                  Delete {selectedFiles.size === 1 ? 'File' : `${selectedFiles.size} Files`}
                 </Button>
               </div>
             </div>

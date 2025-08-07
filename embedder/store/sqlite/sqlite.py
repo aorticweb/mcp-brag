@@ -8,7 +8,7 @@ from embedder.store.sqlite.sql import (
     SqliteConnInstance,
     SqliteEmbeddingRow,
     create_collection,
-    delete_all_embeddings,
+    delete_embeddings,
     delete_collection,
     delete_collection_by_name,
     get_collection_sources,
@@ -296,11 +296,11 @@ class SqliteDataSourceMap(DataSourceMap):
         for collection in get_collection_sources(conn):
             yield collection
 
-    def delete_all_vectors(self):
-        """Delete all vectors for a specific data source.
+    def delete_vectors(self, source: Optional[str] = None) -> int:
+        """Delete all vectors for a specific data source or all sources if source is None.
 
         Args:
             source: Source identifier whose vectors should be deleted
         """
         conn = SqliteConnInstance().conn
-        return delete_all_embeddings(conn)
+        return delete_embeddings(conn, source)

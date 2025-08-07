@@ -51,7 +51,8 @@ export const DangerZoneView: React.FC<DangerZoneViewProps> = () => {
                 </h3>
                 <p className="text-foreground-secondary mb-4">
                   This will delete all vectors from the database and mark all data sources as
-                  needing reprocessing. This action cannot be undone.
+                  needing reprocessing. This action cannot be undone. Data sources from local files can be reprocessed by clicking the refresh button.
+                  Data sources from remote sources cannot be reprocessed and will have to be deleted, then re-ingested.
                 </p>
                 <Button
                   variant="destructive"

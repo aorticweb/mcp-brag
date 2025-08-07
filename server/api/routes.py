@@ -18,7 +18,7 @@ from server.api.internal import (
     _list_data_sources_files,
     _list_data_sources_files_by_name,
     _most_relevant_files,
-    _process_file_async,
+    _process_files_async,
     _process_url,
     _search_files,
 )
@@ -72,9 +72,25 @@ async def process_file_async_api(request: Request) -> JSONResponse:
             f"Too many files: {len(file_paths)} in path {file_path} (max = {INGESTION_PROCESS_MAX_FILE_PATHS.value})",
             code=400,
         )
-    asyncio.get_event_loop().run_in_executor(None, _process_file_async, file_paths, data.get("source_name"))
+    asyncio.get_event_loop().run_in_executor(None, _process_files_async, file_paths, data.get("source_name"))
     return JSONResponse({"status": "success"}, status_code=201)
 
+async def re_process_file_async_api(request: Request) -> JSONResponse:
+    """
+    API endpoint to re-process a file asynchronously for embedding
+
+    Args:
+        request: HTTP request containing file_path and optional source_name
+
+    Returns:
+        JSONResponse: Success status with confirmation message
+    """
+    data = await request.json()
+    file_path = data["file_path"]
+    if not os.path.exists(file_path) or os.path.isdir(file_path):
+        raise MCPError(f"File {file_path} does not exist", code=400)
+    asyncio.get_event_loop().run_in_executor(None, _process_files_async, [file_path], None, True)
+    return JSONResponse({"status": "success"}, status_code=201)
 
 async def process_url_async_api(request: Request) -> JSONResponse:
     """
@@ -352,6 +368,7 @@ ROUTES = [
     Route("/manual/mark_data_sources_as_active", mark_data_sources_as_active_api, methods=["POST"]),
     Route("/manual/mark_data_sources_as_inactive", mark_data_sources_as_inactive_api, methods=["POST"]),
     Route("/manual/delete_vectors", clear_vectors_api, methods=["POST"]),
+    Route("/manual/reprocess_file_async", re_process_file_async_api, methods=["POST"]),
     # Not documented
     Route("/manual/deep_search", deep_search_api, methods=["POST"]),
     Route("/manual/most_relevant_files", most_relevant_files_api, methods=["POST"]),

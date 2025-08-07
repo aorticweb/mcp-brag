@@ -42,6 +42,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProcessFileAsyncResponse'
 
+  /manual/reprocess_file_async:
+    post:
+      summary: Reprocess a file for embedding asynchronously
+      description: Starts reprocessing a single file to regenerate embeddings in the background and returns immediately. This is useful for updating embeddings after changes to the file content. Unlike process_file_async, this endpoint only accepts individual files, not directories.
+      tags:
+        - File Processing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - file_path
+              properties:
+                file_path:
+                  type: string
+                  description: Path to the file to reprocess (must be an existing file, not a directory)
+                  example: "/path/to/document.txt"
+      responses:
+        '201':
+          description: File reprocessing started successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessFileAsyncResponse'
+        '400':
+          description: Bad request when file does not exist or is a directory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /manual/search_file:
     post:
       summary: Search files using semantic search
