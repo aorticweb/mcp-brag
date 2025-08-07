@@ -171,6 +171,8 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
   const hasShownFetchErrorRef = useRef(false);
 
   // Update a single data source's status without refetching all
@@ -486,6 +488,7 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
     setShowDeleteConfirmation(true);
   };
 
+
   const handleConfirmDelete = async () => {
     if (!dataSourceToDelete && !groupToDelete) return;
 
@@ -494,40 +497,123 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
 
     try {
       if (groupToDelete) {
-        const response = await postManualDeleteDataSourcesByName({
-          body: { source_name: groupToDelete.name },
-        });
-
-        const result = response.data as DeleteDataSourcesByNameResponse;
-
-        if (result.status === 'success') {
-          groupToDelete.files.forEach((file) => {
-            if (pollIntervals[file.source_path]) {
-              clearInterval(pollIntervals[file.source_path]);
+        // Handle bulk delete
+        if (selectedGroups.size > 0) {
+          // Delete each selected group
+          const groupsToDelete = filteredSources.filter(g => selectedGroups.has(g.name));
+          
+          for (const group of groupsToDelete) {
+            if (group.files.length === 1) {
+              // Single file group - use delete_data_source endpoint
+              const response = await postManualDeleteDataSource({
+                body: { source: group.files[0].source_path },
+              });
+              
+              const result = response.data as DeleteDataSourceResponse;
+              
+              if (result.status === 'success' && result.data_source_was_found) {
+                const file = group.files[0];
+                if (pollIntervals[file.source_path]) {
+                  clearInterval(pollIntervals[file.source_path]);
+                }
+              }
+            } else {
+              // Multi-file group - use delete_data_sources_by_name endpoint
+              const response = await postManualDeleteDataSourcesByName({
+                body: { source_name: group.name },
+              });
+              
+              const result = response.data as DeleteDataSourcesByNameResponse;
+              
+              if (result.status === 'success') {
+                group.files.forEach((file) => {
+                  if (pollIntervals[file.source_path]) {
+                    clearInterval(pollIntervals[file.source_path]);
+                  }
+                });
+              }
             }
-          });
-
-          setPollIntervals((prev) => {
-            const newIntervals = { ...prev };
-            groupToDelete.files.forEach((file) => {
-              delete newIntervals[file.source_path];
-            });
-            return newIntervals;
-          });
-
-          setIngestionProgress((prev) => {
-            const newProgress = { ...prev };
-            groupToDelete.files.forEach((file) => {
-              delete newProgress[file.source_path];
-            });
-            return newProgress;
-          });
-
+          }
+          
+          // Clear selection after bulk delete
+          setSelectedGroups(new Set());
+          setIsSelectionMode(false);
+          
           await fetchDataSources(true);
+          toast.success(`Deleted ${groupsToDelete.length} data source groups`, {
+            autoClose: 2000,
+          });
         } else {
-          const errorMsg = 'Failed to delete data source group';
-          // setError(errorMsg);
-          toast.error(errorMsg, { autoClose: 5000 });
+          // Single group delete - check if it's a single file or multi-file group
+          if (groupToDelete.files.length === 1) {
+            // Single file group - use delete_data_source endpoint
+            const response = await postManualDeleteDataSource({
+              body: { source: groupToDelete.files[0].source_path },
+            });
+
+            const result = response.data as DeleteDataSourceResponse;
+
+            if (result.status === 'success' && result.data_source_was_found) {
+              const file = groupToDelete.files[0];
+              if (pollIntervals[file.source_path]) {
+                clearInterval(pollIntervals[file.source_path]);
+                setPollIntervals((prev) => {
+                  const newIntervals = { ...prev };
+                  delete newIntervals[file.source_path];
+                  return newIntervals;
+                });
+                setIngestionProgress((prev) => {
+                  const newProgress = { ...prev };
+                  delete newProgress[file.source_path];
+                  return newProgress;
+                });
+              }
+
+              await fetchDataSources(true);
+            } else if (!result.data_source_was_found) {
+              const errorMsg = `Data source not found: ${groupToDelete.name}`;
+              toast.error(errorMsg, { autoClose: 5000 });
+            } else {
+              const errorMsg = 'Failed to delete data source';
+              toast.error(errorMsg, { autoClose: 5000 });
+            }
+          } else {
+            // Multi-file group - use delete_data_sources_by_name endpoint
+            const response = await postManualDeleteDataSourcesByName({
+              body: { source_name: groupToDelete.name },
+            });
+
+            const result = response.data as DeleteDataSourcesByNameResponse;
+
+            if (result.status === 'success') {
+              groupToDelete.files.forEach((file) => {
+                if (pollIntervals[file.source_path]) {
+                  clearInterval(pollIntervals[file.source_path]);
+                }
+              });
+
+              setPollIntervals((prev) => {
+                const newIntervals = { ...prev };
+                groupToDelete.files.forEach((file) => {
+                  delete newIntervals[file.source_path];
+                });
+                return newIntervals;
+              });
+
+              setIngestionProgress((prev) => {
+                const newProgress = { ...prev };
+                groupToDelete.files.forEach((file) => {
+                  delete newProgress[file.source_path];
+                });
+                return newProgress;
+              });
+
+              await fetchDataSources(true);
+            } else {
+              const errorMsg = 'Failed to delete data source group';
+              toast.error(errorMsg, { autoClose: 5000 });
+            }
+          }
         }
       } else if (dataSourceToDelete) {
         const response = await postManualDeleteDataSource({
@@ -641,6 +727,23 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
     });
   };
 
+  const toggleGroupSelection = (groupName: string) => {
+    setSelectedGroups((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupName)) {
+        newSet.delete(groupName);
+      } else {
+        newSet.add(groupName);
+      }
+      // Enter selection mode when selecting items
+      if (newSet.size > 0) {
+        setIsSelectionMode(true);
+      }
+      return newSet;
+    });
+  };
+
+
   const groupedSources = useMemo(() => {
     const grouped = groupDataSourcesByName(dataSources);
 
@@ -678,6 +781,58 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
     });
   }, [groupedSources, searchQuery, selectedStatus]);
 
+  const selectAllGroups = useCallback(() => {
+    const allGroupNames = filteredSources.map(g => g.name);
+    setSelectedGroups(new Set(allGroupNames));
+    setIsSelectionMode(true);
+  }, [filteredSources]);
+
+  const deselectAllGroups = useCallback(() => {
+    setSelectedGroups(new Set());
+    setIsSelectionMode(false);
+  }, []);
+
+  const handleBulkDelete = () => {
+    if (selectedGroups.size === 0) return;
+    
+    // Create a combined group for bulk delete confirmation
+    const groupsToDelete = filteredSources.filter(g => selectedGroups.has(g.name));
+    const totalVectors = groupsToDelete.reduce((sum, g) => sum + g.totalVectorCount, 0);
+    
+    setGroupToDelete({
+      name: `${selectedGroups.size} groups`,
+      files: [],
+      totalVectorCount: totalVectors,
+      totalDimension: 0,
+      aggregatedStatus: 'completed' as const,
+      processingProgress: undefined
+    });
+    setDataSourceToDelete(null);
+    setShowDeleteConfirmation(true);
+  };
+
+  // Handle keyboard shortcuts for selection
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+A or Ctrl+A for select all
+      if ((e.metaKey || e.ctrlKey) && e.key === 'a' && filteredSources.length > 0) {
+        e.preventDefault();
+        if (selectedGroups.size === filteredSources.length) {
+          deselectAllGroups();
+        } else {
+          selectAllGroups();
+        }
+      }
+      // Escape to cancel selection
+      if (e.key === 'Escape' && selectedGroups.size > 0) {
+        deselectAllGroups();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [filteredSources, selectedGroups.size, selectAllGroups, deselectAllGroups]);
+
   if (loading) {
     return (
       <div className={cn('flex items-center justify-center h-full')}>
@@ -691,7 +846,10 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
 
   return (
     <div className={cn('min-h-screen transition-all duration-300', isSidebarCollapsed && 'pl-16')}>
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className={cn(
+        "max-w-7xl mx-auto px-6 py-8 transition-all duration-300",
+        selectedGroups.size > 0 && "pb-28"
+      )}>
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-semibold tracking-tight mb-2">Data Sources</h1>
@@ -761,6 +919,43 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
           </div>
 
           <div className="flex items-center gap-2">
+            {filteredSources.length > 0 && (
+              <Button
+                onClick={() => {
+                  if (selectedGroups.size === filteredSources.length) {
+                    deselectAllGroups();
+                  } else {
+                    selectAllGroups();
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="h-8"
+              >
+                <div className="flex items-center gap-1.5">
+                  <div className={cn(
+                    "w-4 h-4 border rounded transition-all duration-200",
+                    selectedGroups.size === filteredSources.length 
+                      ? "bg-primary border-primary" 
+                      : selectedGroups.size > 0 
+                        ? "bg-primary/50 border-primary"
+                        : "border-border-strong"
+                  )}>
+                    {selectedGroups.size > 0 && (
+                      <svg className="w-full h-full text-white" viewBox="0 0 24 24" fill="none">
+                        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </div>
+                  <span className="text-xs font-medium">
+                    {selectedGroups.size === 0 ? 'Select All' : 
+                     selectedGroups.size === filteredSources.length ? 'Deselect All' : 
+                     `${selectedGroups.size} selected`}
+                  </span>
+                </div>
+              </Button>
+            )}
+            
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
@@ -808,11 +1003,16 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                       className={cn(
                         'transition-all duration-200',
                         isHovered && 'bg-background-elevated',
-                        hasMultipleFiles && 'cursor-pointer'
+                        hasMultipleFiles && !isSelectionMode && 'cursor-pointer',
+                        selectedGroups.has(group.name) && 'bg-primary/5'
                       )}
                       onMouseEnter={() => setHoveredRow(group.name)}
                       onMouseLeave={() => setHoveredRow(null)}
-                      onClick={() => hasMultipleFiles && toggleGroupExpansion(group.name)}
+                      onClick={() => {
+                        if (!isSelectionMode && hasMultipleFiles) {
+                          toggleGroupExpansion(group.name);
+                        }
+                      }}
                     >
                       <div className="px-6 py-4">
                         <div className="flex items-center gap-4">
@@ -843,31 +1043,33 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                                     {group.files.length}
                                   </span>
                                 </div>
-                                <div
-                                  className={cn(
-                                    'absolute -bottom-1 left-1/2 transform -translate-x-1/2 transition-all duration-200',
-                                    isExpanded
-                                      ? 'opacity-100'
-                                      : 'opacity-0 group-hover/icon:opacity-100'
-                                  )}
-                                >
-                                  <svg
+                                {!isSelectionMode && (
+                                  <div
                                     className={cn(
-                                      'w-3 h-3 text-foreground-tertiary transition-transform duration-200',
-                                      isExpanded && 'rotate-180'
+                                      'absolute -bottom-1 left-1/2 transform -translate-x-1/2 transition-all duration-200',
+                                      isExpanded
+                                        ? 'opacity-100'
+                                        : 'opacity-0 group-hover/icon:opacity-100'
                                     )}
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
                                   >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={3}
-                                      d="M19 9l-7 7-7-7"
-                                    />
-                                  </svg>
-                                </div>
+                                    <svg
+                                      className={cn(
+                                        'w-3 h-3 text-foreground-tertiary transition-transform duration-200',
+                                        isExpanded && 'rotate-180'
+                                      )}
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={3}
+                                        d="M19 9l-7 7-7-7"
+                                      />
+                                    </svg>
+                                  </div>
+                                )}
                               </>
                             )}
                           </div>
@@ -908,8 +1110,41 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
 
                           {/* Actions */}
                           <div className="flex items-center gap-3">
+                            {/* Checkbox for selection */}
                             <label
                               className="relative inline-flex items-center cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                className="sr-only peer"
+                                checked={selectedGroups.has(group.name)}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  toggleGroupSelection(group.name);
+                                }}
+                              />
+                              <div className={cn(
+                                "w-5 h-5 border-2 rounded transition-all duration-200",
+                                "hover:border-primary/50",
+                                selectedGroups.has(group.name)
+                                  ? "bg-primary border-primary"
+                                  : "bg-background border-border-strong"
+                              )}>
+                                {selectedGroups.has(group.name) && (
+                                  <svg className="w-full h-full text-white p-0.5" viewBox="0 0 24 24" fill="none">
+                                    <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                )}
+                              </div>
+                            </label>
+
+                            {/* Toggle active/inactive */}
+                            <label
+                              className={cn(
+                                "relative inline-flex items-center cursor-pointer transition-opacity duration-200",
+                                isSelectionMode && "opacity-0 pointer-events-none"
+                              )}
                               onClick={(e) => e.stopPropagation()}
                             >
                               <input
@@ -928,6 +1163,7 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                               </div>
                             </label>
 
+                            {/* Delete button (only visible on hover when not in selection mode) */}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -938,11 +1174,15 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                                   : handleDeleteDataSource(group.files[0]);
                               }}
                               className={cn(
-                                'opacity-0 transition-opacity duration-200',
-                                isHovered && 'opacity-100'
+                                "transition-all duration-200",
+                                isSelectionMode 
+                                  ? "opacity-0 pointer-events-none" 
+                                  : isHovered 
+                                    ? "opacity-100" 
+                                    : "opacity-0"
                               )}
                             >
-                              <TrashIcon className="w-4 h-4 text-red-600 dark:text-red-400" />
+                              <TrashIcon className="w-4 h-4 text-destructive" />
                             </Button>
                           </div>
                         </div>
@@ -1221,6 +1461,53 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
           </div>
         </div>
       )}
+
+      {/* Bulk Actions Toolbar - Apple Style */}
+      <div className={cn(
+        "fixed bottom-0 left-0 right-0 z-40 transition-all duration-300 ease-out",
+        selectedGroups.size > 0 ? "translate-y-0" : "translate-y-full"
+      )}>
+        <div className="bg-background/95 backdrop-blur-xl border-t border-border shadow-[0_-8px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_-8px_24px_rgba(0,0,0,0.4)]">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-foreground">
+                  {selectedGroups.size} {selectedGroups.size === 1 ? 'group' : 'groups'} selected
+                </span>
+                <span className="text-sm text-foreground-secondary">
+                  ({filteredSources
+                    .filter(g => selectedGroups.has(g.name))
+                    .reduce((sum, g) => sum + g.totalVectorCount, 0)
+                    .toLocaleString()} vectors)
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={deselectAllGroups}
+                  className="text-foreground-secondary hover:text-foreground"
+                >
+                  Cancel
+                </Button>
+                
+                <div className="w-px h-6 bg-border mx-2" />
+                
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600"
+                >
+                  <TrashIcon className="w-4 h-4 mr-1.5" />
+                  Delete {selectedGroups.size === 1 ? 'Group' : `${selectedGroups.size} Groups`}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
