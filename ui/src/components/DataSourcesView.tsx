@@ -40,7 +40,7 @@ type GroupedDataSource = {
   files: DataSourceFile[];
   totalVectorCount: number;
   totalDimension: number;
-  aggregatedStatus: 'not_found' | 'processing' | 'completed' | 'failed';
+  aggregatedStatus: 'not_found' | 'processing' | 'completed' | 'failed' | 'partially_successful';
   processingProgress?: {
     phases?: Array<{
       phase:
@@ -73,11 +73,13 @@ function groupDataSourcesByName(dataSources: DataSourceFile[]): GroupedDataSourc
     const sortedFiles = files.sort((a, b) => a.source_path.localeCompare(b.source_path));
     const totalVectorCount = sortedFiles.reduce((sum, file) => sum + file.vector_count, 0);
 
-    let aggregatedStatus: 'not_found' | 'processing' | 'completed' | 'failed';
+    let aggregatedStatus: 'not_found' | 'processing' | 'completed' | 'failed' | 'partially_successful';
     if (sortedFiles.some((file) => file.status === 'processing')) {
       aggregatedStatus = 'processing';
     } else if (sortedFiles.every((file) => file.status === 'completed')) {
       aggregatedStatus = 'completed';
+    } else if (sortedFiles.some((file) => file.status === 'completed') && sortedFiles.some((file) => file.status === 'failed')) {
+      aggregatedStatus = 'partially_successful';
     } else if (sortedFiles.some((file) => file.status === 'failed')) {
       aggregatedStatus = 'failed';
     } else {
@@ -719,9 +721,9 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
             </p>
           </div>
           <div className="bg-background border border-border rounded-xl p-4">
-            <p className="text-sm text-foreground-secondary mb-1">Processing</p>
+            <p className="text-sm text-foreground-secondary mb-1">Processing/Partial</p>
             <p className="text-2xl font-semibold text-warning">
-              {groupedSources.filter((g) => g.aggregatedStatus === 'processing').length}
+              {groupedSources.filter((g) => g.aggregatedStatus === 'processing' || g.aggregatedStatus === 'partially_successful').length}
             </p>
           </div>
         </div>
@@ -775,6 +777,7 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
               <option value="completed">Completed</option>
               <option value="processing">Processing</option>
               <option value="failed">Failed</option>
+              <option value="partially_successful">Partial</option>
             </select>
 
             <Button
@@ -881,27 +884,24 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
 
                           {/* Stats */}
                           <div className="flex items-center gap-6 text-sm">
-                            <div>
+                            <div className="min-w-[80px]">
                               <p className="text-foreground-secondary">Vectors</p>
                               <p className="font-mono font-medium">
                                 {group.totalVectorCount.toLocaleString()}
                               </p>
                             </div>
-                            <div>
-                              <p className="text-foreground-secondary">Dimension</p>
-                              <p className="font-mono font-medium">{group.totalDimension}D</p>
-                            </div>
-                            <div>
+                            <div className="min-w-[90px]">
                               <p className="text-foreground-secondary">Status</p>
                               <p
                                 className={cn(
                                   'font-medium capitalize',
                                   group.aggregatedStatus === 'completed' && 'text-accent-success',
                                   group.aggregatedStatus === 'processing' && 'text-warning',
-                                  group.aggregatedStatus === 'failed' && 'text-destructive'
+                                  group.aggregatedStatus === 'failed' && 'text-destructive',
+                                  group.aggregatedStatus === 'partially_successful' && 'text-warning'
                                 )}
                               >
-                                {group.aggregatedStatus}
+                                {group.aggregatedStatus === 'partially_successful' ? 'Partial' : group.aggregatedStatus}
                               </p>
                             </div>
                           </div>

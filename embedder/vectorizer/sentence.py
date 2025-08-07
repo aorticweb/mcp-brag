@@ -8,6 +8,7 @@ from common import log
 from common.device import best_device
 from embedder.text import TextBatch
 from embedder.vectorizer.interface import Vectorizer
+from embedder.constants import EMBEDDING_SIZE
 
 logger = log.get_logger(__name__)
 
@@ -43,6 +44,7 @@ class SentenceTransformerVectorizer(Vectorizer):
                 self._model_path,
                 device=self._device,
                 tokenizer_kwargs={"use_fast": True, "clean_up_tokenization_spaces": True},
+                truncate_dim=EMBEDDING_SIZE.value,
             )
             self._model.eval()  # make sure we're in inference mode, not training
 
