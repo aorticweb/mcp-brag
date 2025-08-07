@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { DataSourcesView } from './DataSourcesView';
 import { ConfigView } from './ConfigView';
+import { DangerZoneView } from './DangerZoneView';
 import { Toast } from './Toast';
 import { BackendOfflineError } from './BackendOfflineError';
 import { useBackendHealth } from '../contexts/BackendHealthContext';
 import { cn } from '../utils';
 
 export const AppLayout: React.FC = () => {
-  const [activeView, setActiveView] = useState<'datasources' | 'config'>('datasources');
+  const [activeView, setActiveView] = useState<'datasources' | 'config' | 'danger'>('datasources');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { isBackendHealthy } = useBackendHealth();
@@ -50,8 +51,10 @@ export const AppLayout: React.FC = () => {
             <BackendOfflineError />
           ) : activeView === 'datasources' ? (
             <DataSourcesView isSidebarCollapsed={isSidebarCollapsed} />
-          ) : (
+          ) : activeView === 'config' ? (
             <ConfigView isSidebarCollapsed={isSidebarCollapsed} />
+          ) : (
+            <DangerZoneView isSidebarCollapsed={isSidebarCollapsed} />
           )}
         </div>
       </main>

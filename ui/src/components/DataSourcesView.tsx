@@ -40,7 +40,13 @@ type GroupedDataSource = {
   files: DataSourceFile[];
   totalVectorCount: number;
   totalDimension: number;
-  aggregatedStatus: 'not_found' | 'processing' | 'completed' | 'failed' | 'partially_successful';
+  aggregatedStatus:
+    | 'not_found'
+    | 'processing'
+    | 'completed'
+    | 'failed'
+    | 'partially_successful'
+    | 'need_reprocessing';
   processingProgress?: {
     phases?: Array<{
       phase:
@@ -73,12 +79,23 @@ function groupDataSourcesByName(dataSources: DataSourceFile[]): GroupedDataSourc
     const sortedFiles = files.sort((a, b) => a.source_path.localeCompare(b.source_path));
     const totalVectorCount = sortedFiles.reduce((sum, file) => sum + file.vector_count, 0);
 
-    let aggregatedStatus: 'not_found' | 'processing' | 'completed' | 'failed' | 'partially_successful';
+    let aggregatedStatus:
+      | 'not_found'
+      | 'processing'
+      | 'completed'
+      | 'failed'
+      | 'partially_successful'
+      | 'need_reprocessing';
     if (sortedFiles.some((file) => file.status === 'processing')) {
       aggregatedStatus = 'processing';
     } else if (sortedFiles.every((file) => file.status === 'completed')) {
       aggregatedStatus = 'completed';
-    } else if (sortedFiles.some((file) => file.status === 'completed') && sortedFiles.some((file) => file.status === 'failed')) {
+    } else if (sortedFiles.some((file) => file.status === 'need_processing')) {
+      aggregatedStatus = 'need_reprocessing';
+    } else if (
+      sortedFiles.some((file) => file.status === 'completed') &&
+      sortedFiles.some((file) => file.status === 'failed')
+    ) {
       aggregatedStatus = 'partially_successful';
     } else if (sortedFiles.some((file) => file.status === 'failed')) {
       aggregatedStatus = 'failed';
@@ -488,7 +505,6 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
     setShowDeleteConfirmation(true);
   };
 
-
   const handleConfirmDelete = async () => {
     if (!dataSourceToDelete && !groupToDelete) return;
 
@@ -500,17 +516,17 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
         // Handle bulk delete
         if (selectedGroups.size > 0) {
           // Delete each selected group
-          const groupsToDelete = filteredSources.filter(g => selectedGroups.has(g.name));
-          
+          const groupsToDelete = filteredSources.filter((g) => selectedGroups.has(g.name));
+
           for (const group of groupsToDelete) {
             if (group.files.length === 1) {
               // Single file group - use delete_data_source endpoint
               const response = await postManualDeleteDataSource({
                 body: { source: group.files[0].source_path },
               });
-              
+
               const result = response.data as DeleteDataSourceResponse;
-              
+
               if (result.status === 'success' && result.data_source_was_found) {
                 const file = group.files[0];
                 if (pollIntervals[file.source_path]) {
@@ -522,9 +538,9 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
               const response = await postManualDeleteDataSourcesByName({
                 body: { source_name: group.name },
               });
-              
+
               const result = response.data as DeleteDataSourcesByNameResponse;
-              
+
               if (result.status === 'success') {
                 group.files.forEach((file) => {
                   if (pollIntervals[file.source_path]) {
@@ -534,11 +550,11 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
               }
             }
           }
-          
+
           // Clear selection after bulk delete
           setSelectedGroups(new Set());
           setIsSelectionMode(false);
-          
+
           await fetchDataSources(true);
           toast.success(`Deleted ${groupsToDelete.length} data source groups`, {
             autoClose: 2000,
@@ -743,7 +759,6 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
     });
   };
 
-
   const groupedSources = useMemo(() => {
     const grouped = groupDataSourcesByName(dataSources);
 
@@ -782,7 +797,7 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
   }, [groupedSources, searchQuery, selectedStatus]);
 
   const selectAllGroups = useCallback(() => {
-    const allGroupNames = filteredSources.map(g => g.name);
+    const allGroupNames = filteredSources.map((g) => g.name);
     setSelectedGroups(new Set(allGroupNames));
     setIsSelectionMode(true);
   }, [filteredSources]);
@@ -794,18 +809,18 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
 
   const handleBulkDelete = () => {
     if (selectedGroups.size === 0) return;
-    
+
     // Create a combined group for bulk delete confirmation
-    const groupsToDelete = filteredSources.filter(g => selectedGroups.has(g.name));
+    const groupsToDelete = filteredSources.filter((g) => selectedGroups.has(g.name));
     const totalVectors = groupsToDelete.reduce((sum, g) => sum + g.totalVectorCount, 0);
-    
+
     setGroupToDelete({
       name: `${selectedGroups.size} groups`,
       files: [],
       totalVectorCount: totalVectors,
       totalDimension: 0,
       aggregatedStatus: 'completed' as const,
-      processingProgress: undefined
+      processingProgress: undefined,
     });
     setDataSourceToDelete(null);
     setShowDeleteConfirmation(true);
@@ -846,10 +861,12 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
 
   return (
     <div className={cn('min-h-screen transition-all duration-300', isSidebarCollapsed && 'pl-16')}>
-      <div className={cn(
-        "max-w-7xl mx-auto px-6 py-8 transition-all duration-300",
-        selectedGroups.size > 0 && "pb-28"
-      )}>
+      <div
+        className={cn(
+          'max-w-7xl mx-auto px-6 py-8 transition-all duration-300',
+          selectedGroups.size > 0 && 'pb-28'
+        )}
+      >
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-semibold tracking-tight mb-2">Data Sources</h1>
@@ -881,7 +898,14 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
           <div className="bg-background border border-border rounded-xl p-4">
             <p className="text-sm text-foreground-secondary mb-1">Processing/Partial</p>
             <p className="text-2xl font-semibold text-warning">
-              {groupedSources.filter((g) => g.aggregatedStatus === 'processing' || g.aggregatedStatus === 'partially_successful').length}
+              {
+                groupedSources.filter(
+                  (g) =>
+                    g.aggregatedStatus === 'processing' ||
+                    g.aggregatedStatus === 'partially_successful' ||
+                    g.aggregatedStatus === 'need_reprocessing'
+                ).length
+              }
             </p>
           </div>
         </div>
@@ -933,29 +957,39 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                 className="h-8"
               >
                 <div className="flex items-center gap-1.5">
-                  <div className={cn(
-                    "w-4 h-4 border rounded transition-all duration-200",
-                    selectedGroups.size === filteredSources.length 
-                      ? "bg-primary border-primary" 
-                      : selectedGroups.size > 0 
-                        ? "bg-primary/50 border-primary"
-                        : "border-border-strong"
-                  )}>
+                  <div
+                    className={cn(
+                      'w-4 h-4 border rounded transition-all duration-200',
+                      selectedGroups.size === filteredSources.length
+                        ? 'bg-primary border-primary'
+                        : selectedGroups.size > 0
+                          ? 'bg-primary/50 border-primary'
+                          : 'border-border-strong'
+                    )}
+                  >
                     {selectedGroups.size > 0 && (
                       <svg className="w-full h-full text-white" viewBox="0 0 24 24" fill="none">
-                        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path
+                          d="M20 6L9 17L4 12"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                     )}
                   </div>
                   <span className="text-xs font-medium">
-                    {selectedGroups.size === 0 ? 'Select All' : 
-                     selectedGroups.size === filteredSources.length ? 'Deselect All' : 
-                     `${selectedGroups.size} selected`}
+                    {selectedGroups.size === 0
+                      ? 'Select All'
+                      : selectedGroups.size === filteredSources.length
+                        ? 'Deselect All'
+                        : `${selectedGroups.size} selected`}
                   </span>
                 </div>
               </Button>
             )}
-            
+
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
@@ -973,6 +1007,7 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
               <option value="processing">Processing</option>
               <option value="failed">Failed</option>
               <option value="partially_successful">Partial</option>
+              <option value="need_reprocessing">Need Reprocessing</option>
             </select>
 
             <Button
@@ -1100,10 +1135,16 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                                   group.aggregatedStatus === 'completed' && 'text-accent-success',
                                   group.aggregatedStatus === 'processing' && 'text-warning',
                                   group.aggregatedStatus === 'failed' && 'text-destructive',
-                                  group.aggregatedStatus === 'partially_successful' && 'text-warning'
+                                  group.aggregatedStatus === 'partially_successful' &&
+                                    'text-warning',
+                                  group.aggregatedStatus === 'need_reprocessing' && 'text-warning'
                                 )}
                               >
-                                {group.aggregatedStatus === 'partially_successful' ? 'Partial' : group.aggregatedStatus}
+                                {group.aggregatedStatus === 'partially_successful'
+                                  ? 'Partial'
+                                  : group.aggregatedStatus === 'need_reprocessing'
+                                    ? 'Need Reprocessing'
+                                    : group.aggregatedStatus}
                               </p>
                             </div>
                           </div>
@@ -1124,16 +1165,28 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                                   toggleGroupSelection(group.name);
                                 }}
                               />
-                              <div className={cn(
-                                "w-5 h-5 border-2 rounded transition-all duration-200",
-                                "hover:border-primary/50",
-                                selectedGroups.has(group.name)
-                                  ? "bg-primary border-primary"
-                                  : "bg-background border-border-strong"
-                              )}>
+                              <div
+                                className={cn(
+                                  'w-5 h-5 border-2 rounded transition-all duration-200',
+                                  'hover:border-primary/50',
+                                  selectedGroups.has(group.name)
+                                    ? 'bg-primary border-primary'
+                                    : 'bg-background border-border-strong'
+                                )}
+                              >
                                 {selectedGroups.has(group.name) && (
-                                  <svg className="w-full h-full text-white p-0.5" viewBox="0 0 24 24" fill="none">
-                                    <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                                  <svg
+                                    className="w-full h-full text-white p-0.5"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                  >
+                                    <path
+                                      d="M20 6L9 17L4 12"
+                                      stroke="currentColor"
+                                      strokeWidth="3"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
                                   </svg>
                                 )}
                               </div>
@@ -1142,8 +1195,8 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                             {/* Toggle active/inactive */}
                             <label
                               className={cn(
-                                "relative inline-flex items-center cursor-pointer transition-opacity duration-200",
-                                isSelectionMode && "opacity-0 pointer-events-none"
+                                'relative inline-flex items-center cursor-pointer transition-opacity duration-200',
+                                isSelectionMode && 'opacity-0 pointer-events-none'
                               )}
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -1174,12 +1227,12 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                                   : handleDeleteDataSource(group.files[0]);
                               }}
                               className={cn(
-                                "transition-all duration-200",
-                                isSelectionMode 
-                                  ? "opacity-0 pointer-events-none" 
-                                  : isHovered 
-                                    ? "opacity-100" 
-                                    : "opacity-0"
+                                'transition-all duration-200',
+                                isSelectionMode
+                                  ? 'opacity-0 pointer-events-none'
+                                  : isHovered
+                                    ? 'opacity-100'
+                                    : 'opacity-0'
                               )}
                             >
                               <TrashIcon className="w-4 h-4 text-destructive" />
@@ -1463,10 +1516,12 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
       )}
 
       {/* Bulk Actions Toolbar - Apple Style */}
-      <div className={cn(
-        "fixed bottom-0 left-0 right-0 z-40 transition-all duration-300 ease-out",
-        selectedGroups.size > 0 ? "translate-y-0" : "translate-y-full"
-      )}>
+      <div
+        className={cn(
+          'fixed bottom-0 left-0 right-0 z-40 transition-all duration-300 ease-out',
+          selectedGroups.size > 0 ? 'translate-y-0' : 'translate-y-full'
+        )}
+      >
         <div className="bg-background/95 backdrop-blur-xl border-t border-border shadow-[0_-8px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_-8px_24px_rgba(0,0,0,0.4)]">
           <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
@@ -1475,13 +1530,15 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                   {selectedGroups.size} {selectedGroups.size === 1 ? 'group' : 'groups'} selected
                 </span>
                 <span className="text-sm text-foreground-secondary">
-                  ({filteredSources
-                    .filter(g => selectedGroups.has(g.name))
+                  (
+                  {filteredSources
+                    .filter((g) => selectedGroups.has(g.name))
                     .reduce((sum, g) => sum + g.totalVectorCount, 0)
-                    .toLocaleString()} vectors)
+                    .toLocaleString()}{' '}
+                  vectors)
                 </span>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
@@ -1491,9 +1548,9 @@ export function DataSourcesView({ isSidebarCollapsed = false }: DataSourcesViewP
                 >
                   Cancel
                 </Button>
-                
+
                 <div className="w-px h-6 bg-border mx-2" />
-                
+
                 <Button
                   variant="destructive"
                   size="sm"

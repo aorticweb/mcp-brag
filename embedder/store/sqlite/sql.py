@@ -133,7 +133,7 @@ def format_sources_for_sqlite(sources: List[str]) -> str:
     return ",".join(f"'{source}'" for source in sources)
 
 
-def initialize_sqlite_tables(conn: sqlite3.Connection, embedding_dim: int) -> None:
+def create_embeddings_table(conn: sqlite3.Connection, embedding_dim: int) -> None:
     conn.execute(
         f"""
             CREATE VIRTUAL TABLE IF NOT EXISTS embeddings USING vec0(
@@ -145,6 +145,10 @@ def initialize_sqlite_tables(conn: sqlite3.Connection, embedding_dim: int) -> No
             );
         """
     )
+
+
+def initialize_sqlite_tables(conn: sqlite3.Connection, embedding_dim: int) -> None:
+    create_embeddings_table(conn, embedding_dim)
 
     conn.execute(
         """
@@ -376,6 +380,24 @@ def delete_collection_by_name(conn: sqlite3.Connection, source_name: str):
     )
     conn.commit()
     return True
+
+
+def delete_all_embeddings(conn: sqlite3.Connection):
+    """Delete all embeddings.
+
+    Args:
+        conn: SQLite connection
+        source_path: The collection source path
+    """
+
+    # Delete the embeddings
+    conn.execute(
+        """
+        DROP TABLE IF EXISTS embeddings;
+        """,
+    )
+    create_embeddings_table(conn, EMBEDDING_SIZE.value)
+    conn.commit()
 
 
 def update_collection_state(conn: sqlite3.Connection, source_path: str, state: CollectionState):

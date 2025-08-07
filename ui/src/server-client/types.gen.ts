@@ -59,7 +59,7 @@ export type DataSourceFile = {
   /**
    * Current ingestion status
    */
-  status: 'not_found' | 'processing' | 'completed' | 'failed';
+  status: 'not_found' | 'processing' | 'completed' | 'failed' | 'need_processing';
   /**
    * Number of vectors generated from this file
    */
@@ -219,6 +219,18 @@ export type ActiveDataSourcesResponse = {
    * List of currently active data source paths
    */
   active_data_sources: Array<string>;
+};
+
+export type DeleteVectorsResponse = {
+  status: 'success';
+  /**
+   * Success message
+   */
+  message: string;
+  /**
+   * Number of vectors that were deleted
+   */
+  vectors_deleted: number;
 };
 
 export type PostManualProcessFileAsyncData = {
@@ -539,6 +551,23 @@ export type PostManualMarkDataSourcesAsInactiveResponses = {
 
 export type PostManualMarkDataSourcesAsInactiveResponse =
   PostManualMarkDataSourcesAsInactiveResponses[keyof PostManualMarkDataSourcesAsInactiveResponses];
+
+export type PostManualDeleteVectorsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/manual/delete_vectors';
+};
+
+export type PostManualDeleteVectorsResponses = {
+  /**
+   * Vectors deleted successfully
+   */
+  200: DeleteVectorsResponse;
+};
+
+export type PostManualDeleteVectorsResponse =
+  PostManualDeleteVectorsResponses[keyof PostManualDeleteVectorsResponses];
 
 export type PostManualProcessUrlAsyncData = {
   body: {

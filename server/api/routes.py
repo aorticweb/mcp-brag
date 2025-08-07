@@ -8,6 +8,7 @@ from starlette.routing import Route
 from common.log import get_logger
 from server.api.config import all_configs, edit_config
 from server.api.internal import (
+    _clear_vectors,
     _deep_search,
     _delete_data_source,
     _delete_data_sources_by_name,
@@ -325,6 +326,16 @@ async def get_active_data_sources_api(_: Request) -> JSONResponse:
     return JSONResponse({"status": "ok", "active_data_sources": active_data_sources})
 
 
+async def clear_vectors_api(_: Request) -> JSONResponse:
+    """
+    API endpoint to clear all vectors and set collections to NEED_PROCESSING
+
+    Returns:
+        JSONResponse: Status of the operation
+    """
+    return JSONResponse(_clear_vectors())
+
+
 ROUTES = [
     Route("/manual/config", get_config_api, methods=["GET"]),
     Route("/manual/config", set_config_api, methods=["POST"]),
@@ -340,6 +351,7 @@ ROUTES = [
     Route("/manual/active_data_sources", get_active_data_sources_api, methods=["GET"]),
     Route("/manual/mark_data_sources_as_active", mark_data_sources_as_active_api, methods=["POST"]),
     Route("/manual/mark_data_sources_as_inactive", mark_data_sources_as_inactive_api, methods=["POST"]),
+    Route("/manual/delete_vectors", clear_vectors_api, methods=["POST"]),
     # Not documented
     Route("/manual/deep_search", deep_search_api, methods=["POST"]),
     Route("/manual/most_relevant_files", most_relevant_files_api, methods=["POST"]),

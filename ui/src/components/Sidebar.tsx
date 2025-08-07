@@ -14,8 +14,8 @@ interface SidebarItem {
 }
 
 interface SidebarProps {
-  activeView: 'datasources' | 'config';
-  onViewChange: (view: 'datasources' | 'config') => void;
+  activeView: 'datasources' | 'config' | 'danger';
+  onViewChange: (view: 'datasources' | 'config' | 'danger') => void;
   className?: string;
   isCollapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
@@ -46,6 +46,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Gear className="w-5 h-5" />,
       shortcut: '⌘,',
     },
+    {
+      id: 'danger',
+      label: 'Danger Zone',
+      icon: (
+        <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M8.26795 2C8.86359 0.666667 10.1364 0.666667 10.7321 2L17.6603 14C18.2559 15.3333 17.6195 16.5 16.4282 16.5H3.57179C2.38051 16.5 1.74411 15.3333 2.33975 14L9.26795 2Z"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
+          <path d="M10 6V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <circle cx="10" cy="13" r="0.5" fill="currentColor" />
+        </svg>
+      ),
+      shortcut: '⌘!',
+    },
   ];
 
   // Keyboard shortcuts
@@ -60,6 +76,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           case ',':
             e.preventDefault();
             onViewChange('config');
+            break;
+          case '!':
+            e.preventDefault();
+            onViewChange('danger');
             break;
           case '[':
             e.preventDefault();
@@ -178,7 +198,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {index > 0 && <div className="h-[1px] bg-border/30 mx-3 my-2" />}
 
                     <button
-                      onClick={() => onViewChange(item.id as 'datasources' | 'config')}
+                      onClick={() => onViewChange(item.id as 'datasources' | 'config' | 'danger')}
                       onMouseEnter={() => setHoveredItem(item.id)}
                       onMouseLeave={() => setHoveredItem(null)}
                       className={cn(

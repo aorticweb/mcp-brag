@@ -6,9 +6,9 @@ from sentence_transformers import SentenceTransformer
 
 from common import log
 from common.device import best_device
+from embedder.constants import EMBEDDING_SIZE
 from embedder.text import TextBatch
 from embedder.vectorizer.interface import Vectorizer
-from embedder.constants import EMBEDDING_SIZE
 
 logger = log.get_logger(__name__)
 

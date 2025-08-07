@@ -30,6 +30,8 @@ import type {
   PostManualMarkDataSourcesAsActiveResponses,
   PostManualMarkDataSourcesAsInactiveData,
   PostManualMarkDataSourcesAsInactiveResponses,
+  PostManualDeleteVectorsData,
+  PostManualDeleteVectorsResponses,
   PostManualProcessUrlAsyncData,
   PostManualProcessUrlAsyncResponses,
   PostManualProcessUrlAsyncErrors,
@@ -328,6 +330,23 @@ export const postManualMarkDataSourcesAsInactive = <ThrowOnError extends boolean
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+};
+
+/**
+ * Delete vectors for all data sources
+ * Deletes all vectors for all data sources from the vector database
+ */
+export const postManualDeleteVectors = <ThrowOnError extends boolean = false>(
+  options?: Options<PostManualDeleteVectorsData, ThrowOnError>
+) => {
+  return (options?.client ?? _heyApiClient).post<
+    PostManualDeleteVectorsResponses,
+    unknown,
+    ThrowOnError
+  >({
+    url: '/manual/delete_vectors',
+    ...options,
   });
 };
 

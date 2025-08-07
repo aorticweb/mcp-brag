@@ -64,6 +64,7 @@ class VectorStoreError(Exception):
 
 class CollectionState(str, Enum):
     NOT_FOUND = "not_found"
+    NEED_PROCESSING = "need_processing"
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -374,5 +375,18 @@ class DataSourceMap(abc.ABC):
 
         Returns:
             Iterator[str]: Iterator over source identifiers
+        """
+        pass
+
+    @abc.abstractmethod
+    def delete_all_vectors(self) -> int:
+        """
+        Delete all vectors for a specific data source
+
+        Args:
+            source: Source identifier whose vectors should be deleted
+
+        Returns:
+            int: Number of vectors deleted
         """
         pass

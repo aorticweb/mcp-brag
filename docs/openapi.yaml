@@ -403,6 +403,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/ActiveDataSourcesResponse'
 
+  /manual/delete_vectors:
+    post:
+      summary: Delete vectors for all data sources
+      description: Deletes all vectors for all data sources from the vector database
+      tags:
+        - Data Sources
+      responses:
+        '200':
+          description: Vectors deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteVectorsResponse'
+
   /manual/process_url_async:
     post:
       summary: Process a URL asynchronously
@@ -539,7 +553,7 @@ components:
         status:
           type: string
           description: Current ingestion status
-          enum: ["not_found", "processing", "completed", "failed"]
+          enum: ["not_found", "processing", "completed", "failed", "need_processing"]
           example: "completed"
         vector_count:
           type: integer
@@ -798,6 +812,26 @@ components:
             type: string
           description: List of currently active data source paths
           example: ["/path/to/document1.txt", "/path/to/document2.txt"]
+
+    DeleteVectorsResponse:
+      type: object
+      required:
+        - status
+        - message
+        - vectors_deleted
+      properties:
+        status:
+          type: string
+          enum: ["success"]
+          example: "success"
+        message:
+          type: string
+          description: Success message
+          example: "Vectors for data source /path/to/document.txt deleted successfully"
+        vectors_deleted:
+          type: integer
+          description: Number of vectors that were deleted
+          example: 42
 
 tags:
   - name: File Processing

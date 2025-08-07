@@ -358,9 +358,11 @@ def _delete_data_sources_by_name(source_name: str) -> Dict[str, Any]:
     found = data_source_map.delete_by_name(source_name)
     return {
         "status": "success",
-        "message": f"Data sources with name {source_name} deleted successfully"
-        if found
-        else f"No data source with name {source_name} were found",
+        "message": (
+            f"Data sources with name {source_name} deleted successfully"
+            if found
+            else f"No data source with name {source_name} were found"
+        ),
         "data_sources_were_found": found,
     }
 
@@ -421,4 +423,27 @@ def _get_collection_ingestion_status(source: str) -> Dict[str, Any]:
         "ingestion_status": stats.status,
         "progress": 0,
         "total_chunk_count": 0,
+    }
+
+
+def _clear_vectors() -> Dict[str, Any]:
+    """
+    Clear all vectors from the database and set all collections to NEED_PROCESSING status
+
+    Returns:
+        Dict[str, Any]: Status of the operation
+    """
+    data_source_map = get_data_source_map()
+    sources = data_source_map.list_sources()
+
+    for source in sources:
+        if source == USER_QUERY_SOURCE:
+            continue
+        data_source_map.set_state(source, CollectionState.NEED_PROCESSING)
+
+    data_source_map.delete_all_vectors()
+
+    return {
+        "status": "success",
+        "message": "Cleared all vectors",
     }
