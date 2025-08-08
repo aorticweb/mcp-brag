@@ -25,8 +25,17 @@ class HTMLReader(Reader):
         Returns:
             str: The original HTML content including all tags, scripts, styles, etc.
         """
-        with open(self.file_path, "r", encoding="utf-8") as file:
-            return file.read()
+        with open(self.file_path, "r", encoding="utf-8", errors="replace") as file:
+            html_content = file.read()
+
+        ctn = ""
+        # Extract text chunks with accurate position tracking
+        for text_chunk in self._extract_text_with_accurate_positions(html_content):
+            if text_chunk.text.strip():  # Only yield non-empty text chunks
+                # Split large chunks into smaller ones respecting the size limit
+                for chunked_segment in self._split_text_chunk(text_chunk):
+                    ctn += chunked_segment.text
+        return ctn
 
     def read_iter(self) -> Iterator[TextChunk]:
         """
@@ -39,7 +48,7 @@ class HTMLReader(Reader):
         Yields:
             TextChunk: Chunk containing extracted text and its original HTML indices
         """
-        with open(self.file_path, "r", encoding="utf-8") as file:
+        with open(self.file_path, "r", encoding="utf-8", errors="replace") as file:
             html_content = file.read()
 
         # Extract text chunks with accurate position tracking

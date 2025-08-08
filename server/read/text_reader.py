@@ -16,7 +16,7 @@ class TextReader(Reader):
         return SourceType.LOCAL_TEXT_FILE
 
     def read(self) -> str:
-        with open(self.file_path, "r", encoding="utf-8") as file:
+        with open(self.file_path, "r", encoding="utf-8", errors="replace") as file:
             return file.read()
 
     def read_iter(self) -> Iterator[TextChunk]:
@@ -33,7 +33,7 @@ class TextReader(Reader):
         """
         char_index = 0
 
-        with open(self.file_path, "r", encoding="utf-8") as file:
+        with open(self.file_path, "r", encoding="utf-8", errors="replace") as file:
             for line in file:
                 line_length = len(line)
 

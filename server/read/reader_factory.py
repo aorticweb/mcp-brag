@@ -3,7 +3,6 @@
 # from server.read.rtf_reader import RtfReader
 # from server.read.odt_reader import OdtReader
 # from server.read.odp_reader import OdpReader
-# from server.read.html_reader import HtmlReader
 # from server.read.markdown_reader import MarkdownReader
 # from server.read.pages_reader import PagesReader
 # from server.read.key_reader import KeynoteReader
@@ -19,6 +18,7 @@ from typing import Dict, Type
 from common.log import get_logger
 from server.constants import CHUNK_CHARACTER_LIMIT
 from server.read.docx_reader import DocxReader
+from server.read.html_reader import HTMLReader
 from server.read.pdf_reader import PDFReader
 from server.read.pptx_reader import PptxReader
 from server.read.reader import Reader
@@ -51,8 +51,8 @@ class ReaderFactory:
         # Text formats
         ".txt": TextReader,
         # '.rtf': RtfReader,
-        # '.html': HtmlReader,
-        # '.htm': HtmlReader,
+        ".html": HTMLReader,
+        ".htm": HTMLReader,
         # '.md': MarkdownReader,
         # '.markdown': MarkdownReader,
         # '.tex': TexReader,
